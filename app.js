@@ -82,7 +82,12 @@ function renderDashboard() {
             : "bg-slate-800/50 rounded-xl p-5 flex flex-col gap-4 shadow-md relative";
           return `
             <div class="${cardClass}" data-posten-id="${p.id}">
-              <div class="font-semibold text-lg mb-2">${p.name}</div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-lg">${p.name}</span>
+                <button class="edit-posten-btn p-1 ml-2 text-indigo-400 hover:text-indigo-200" title="Bearbeiten">
+                  <i data-lucide="edit-3" class="w-5 h-5"></i>
+                </button>
+              </div>
               <div class="flex items-center gap-2 mb-4">
                 <span class="text-emerald-400 font-mono text-xl">€ ${p.ziel_betrag.toFixed(2)}</span>
               </div>
@@ -90,7 +95,6 @@ function renderDashboard() {
                 <button class="show-kontoauszug-btn border border-emerald-600 text-emerald-400 rounded px-3 py-1 text-xs flex-1">Kontoauszug</button>
                 <button class="trans-btn border border-slate-500 text-slate-300 rounded px-3 py-1 text-xs flex-1">Transaktion</button>
                 <button class="rate-btn bg-indigo-600 hover:bg-indigo-700 text-white rounded px-3 py-1 text-xs flex-1">Rate anpassen</button>
-                <button class="edit-posten-btn bg-indigo-600 hover:bg-indigo-700 text-white rounded px-3 py-1 text-xs flex-1">Bearbeiten</button>
               </div>
             </div>
           `;
@@ -99,6 +103,10 @@ function renderDashboard() {
       </div>
     </div>
   `;
+  // Nach dem vollständigen Rendern: Lucide Icons ersetzen
+  if (window.lucide && window.lucide.createIcons) {
+    window.lucide.createIcons();
+  }
 }
 
 // --- Rate anpassen Modal & Button ---
@@ -376,8 +384,9 @@ function openEditPostenModal(postenId) {
 
 // --- Edit-Button-Handler ---
 document.addEventListener('click', (e) => {
-  if (e.target && e.target.classList.contains('edit-posten-btn')) {
-    const postenId = e.target.closest('[data-posten-id]')?.dataset.postenId;
+  let btn = e.target.closest('.edit-posten-btn');
+  if (btn) {
+    const postenId = btn.closest('[data-posten-id]')?.dataset.postenId;
     if (postenId) openEditPostenModal(postenId);
   }
 });
@@ -504,14 +513,7 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
   document.body.appendChild(modalDiv);
 }
 
-// Handler für Kontoauszug-Button (global, nach Funktionsdefinition)
-document.addEventListener('click', (e) => {
-  const card = e.target.closest('[data-posten-id]');
-  if (card && e.target.classList.contains('show-kontoauszug-btn')) {
-    window.openKontoauszugModal(card.dataset.postenId);
-  }
-});
-// Handler für Kontoauszug-Button (jetzt wirklich am Ende, nach allen Funktionsdefinitionen)
+// Handler für Kontoauszug-Button (nur einmal, nach Funktionsdefinition)
 document.addEventListener('click', (e) => {
   const card = e.target.closest('[data-posten-id]');
   if (card && typeof window.openKontoauszugModal === 'function' && e.target.classList.contains('show-kontoauszug-btn')) {
