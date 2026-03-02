@@ -66,13 +66,13 @@ Orientierung am modernen "Dark-Slate" Dashboard-Look.
 *KI-Anweisung: Markiere erledigte Punkte mit [x] während der Entwicklung.*
 
 ### Phase 1: Fundament & Auth
-- [ ] Grundstruktur `index.html` mit CDN-Anbindungen.
-- [ ] Supabase Auth Integration (Login/Logout Views).
-- [ ] "Allgemein"-Posten Logik (Prüfen/Erstellen bei Login).
+- [x] Grundstruktur `index.html` mit CDN-Anbindungen.
+- [x] Supabase Auth Integration (Login/Logout Views).
+- [x] "Allgemein"-Posten Logik (Prüfen/Erstellen bei Login).
 
 ### Phase 2: Posten-Management & Logik
-- [ ] Dashboard Grid-Ansicht (Karten-Layout gemäß Screenshot).
-- [ ] Dynamische Salden-Berechnung (Raten + Transaktionen).
+- [x] Dashboard Grid-Ansicht (Karten-Layout gemäß Screenshot).
+- [x] Dynamische Salden-Berechnung (Raten + Transaktionen).
 - [ ] Rötliche Warn-Logik für überfällige Posten.
 
 ### Phase 3: Transaktionen & Automatik
