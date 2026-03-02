@@ -346,6 +346,18 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// --- Button-Handler für Rate und Transaktion ---
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.classList.contains('rate-btn')) {
+    const postenId = e.target.closest('[data-posten-id]')?.dataset.postenId;
+    if (postenId) openRateModal(postenId);
+  }
+  if (e.target && e.target.classList.contains('trans-btn')) {
+    const postenId = e.target.closest('[data-posten-id]')?.dataset.postenId;
+    if (postenId) openTransModal(postenId);
+  }
+});
+
 // --- Daten laden ---
 async function loadData() {
   // Posten
