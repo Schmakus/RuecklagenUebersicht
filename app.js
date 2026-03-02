@@ -437,14 +437,24 @@ async function loadData() {
         // Prüfe, ob für diesen Monat schon eine Rate als Einzahlung gebucht wurde
         const exists = transaktionen.some(t => t.posten_id === p.id && t.typ === 'einzahlung' && t.notiz === 'Automatische Rate' && t.datum === buchungsDatum.toISOString().slice(0,10));
         if (!exists) {
-          // Buche automatisch eine Einzahlung
-          await supabase.from('transaktionen').insert({
+          // Debug: Logge Insert-Werte
+          const insertObj = {
+            user_id: user.id,
             posten_id: p.id,
-            betrag: rate.betrag,
+            betrag: Number(rate.betrag),
             typ: 'einzahlung',
             datum: buchungsDatum.toISOString().slice(0,10),
             notiz: 'Automatische Rate'
-          });
+          };
+          console.log('Auto-Insert transaktion:', insertObj);
+          try {
+            const { error } = await supabase.from('transaktionen').insert(insertObj);
+            if (error) {
+              console.error('Insert-Fehler:', error);
+            }
+          } catch (err) {
+            console.error('Insert-Exception:', err);
+          }
         }
         // Nächster Monat
         d.setMonth(d.getMonth() + 1);

@@ -21,10 +21,12 @@ create table raten (
 
 create table transaktionen (
   id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users not null default auth.uid(),
   posten_id uuid references posten(id) on delete cascade,
   betrag numeric(12,2) not null,
   typ text check (typ in ('einzahlung', 'auszahlung')),
-  datum date not null default current_date
+  datum date not null default current_date,
+  notiz text
 );
 
 -- Row Level Security (RLS) aktivieren
