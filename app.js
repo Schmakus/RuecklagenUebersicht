@@ -89,6 +89,9 @@ function openRateModal(postenId) {
           <label class="text-sm">Neue monatliche Rate (€):
             <input name="betrag" type="number" min="0" step="0.01" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
+          <label class="text-sm">Startdatum der neuen Rate:
+            <input name="start_datum" type="date" value="${new Date().toISOString().slice(0,10)}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+          </label>
           <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded px-4 py-2 mt-2">Speichern</button>
         </form>
       </div>
@@ -101,11 +104,12 @@ function openRateModal(postenId) {
   document.getElementById('rate-form').onsubmit = async (e) => {
     e.preventDefault();
     const betrag = Number(e.target.betrag.value);
-    if (isNaN(betrag) || betrag <= 0) return alert('Ungültiger Betrag!');
+    const start_datum = e.target.start_datum.value;
+    if (isNaN(betrag) || betrag <= 0 || !start_datum) return alert('Ungültige Eingabe!');
     await supabase.from('raten').insert({
       posten_id: postenId,
       betrag,
-      start_datum: new Date().toISOString().slice(0, 10)
+      start_datum
     });
     document.getElementById('modal-overlay').remove();
     await loadData();
@@ -132,6 +136,9 @@ function openTransModal(postenId) {
               <option value="auszahlung">Auszahlung</option>
             </select>
           </label>
+          <label class="text-sm">Datum:
+            <input name="datum" type="date" value="${new Date().toISOString().slice(0,10)}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+          </label>
           <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded px-4 py-2 mt-2">Speichern</button>
         </form>
       </div>
@@ -145,12 +152,13 @@ function openTransModal(postenId) {
     e.preventDefault();
     const betrag = Number(e.target.betrag.value);
     const typ = e.target.typ.value;
-    if (isNaN(betrag) || betrag === 0) return alert('Ungültiger Betrag!');
+    const datum = e.target.datum.value;
+    if (isNaN(betrag) || betrag === 0 || !datum) return alert('Ungültige Eingabe!');
     await supabase.from('transaktionen').insert({
       posten_id: postenId,
       betrag,
       typ,
-      datum: new Date().toISOString().slice(0, 10)
+      datum
     });
     document.getElementById('modal-overlay').remove();
     await loadData();
