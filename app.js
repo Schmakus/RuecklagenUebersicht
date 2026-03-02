@@ -483,11 +483,11 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
   // Nur tatsächlich gebuchte Transaktionen (inkl. automatische Raten)
   const transList = transaktionen.filter(t => t.posten_id === postenId)
     .sort((a, b) => new Date(a.datum) - new Date(b.datum));
-  // Modal-HTML
+  // Modal-HTML identisch zu Transaktions-Modal
   const modalHtml = `
     <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div class="bg-slate-900 rounded-xl p-6 w-full max-w-md shadow-lg relative">
-        <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick="document.getElementById('modal-overlay').remove()">✕</button>
+        <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick=\"document.getElementById('modal-overlay').remove()\">✕</button>
         <h2 class="text-lg font-bold mb-4">Kontoauszug: ${p.name}</h2>
         <table class="w-full text-left mb-2">
           <thead><tr><th>Datum</th><th>Betrag</th><th>Typ</th><th>Notiz</th></tr></thead>
