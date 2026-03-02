@@ -415,6 +415,42 @@ async function loadData() {
     .select('*')
     .in('posten_id', posten.map(p => p.id));
   transaktionen = transData || [];
+
+  // --- Automatische Buchung der Rate als monatliche Einzahlung ---
+  // Für jeden Posten: prüfe alle aktiven Raten und buche ggf. fehlende Einzahlungen
+  for (const p of posten) {
+    // Alle Raten für diesen Posten, sortiert nach Startdatum
+    const ratenList = raten.filter(r => r.posten_id === p.id).sort((a, b) => new Date(a.start_datum) - new Date(b.start_datum));
+    if (ratenList.length === 0) continue;
+    let today = new Date();
+    for (let i = 0; i < ratenList.length; i++) {
+      const rate = ratenList[i];
+      const start = new Date(rate.start_datum);
+      const end = ratenList[i+1] ? new Date(ratenList[i+1].start_datum) : today;
+      // Für jeden Monat im Zeitraum [start, end):
+      let d = new Date(start);
+      while (d < end) {
+        // Buchungstag ist immer der Tag des Monats wie im Startdatum
+        const buchungsTag = start.getDate();
+        const buchungsDatum = new Date(d.getFullYear(), d.getMonth(), buchungsTag);
+        if (buchungsDatum > today) break;
+        // Prüfe, ob für diesen Monat schon eine Rate als Einzahlung gebucht wurde
+        const exists = transaktionen.some(t => t.posten_id === p.id && t.typ === 'einzahlung' && t.notiz === 'Automatische Rate' && t.datum === buchungsDatum.toISOString().slice(0,10));
+        if (!exists) {
+          // Buche automatisch eine Einzahlung
+          await supabase.from('transaktionen').insert({
+            posten_id: p.id,
+            betrag: rate.betrag,
+            typ: 'einzahlung',
+            datum: buchungsDatum.toISOString().slice(0,10),
+            notiz: 'Automatische Rate'
+          });
+        }
+        // Nächster Monat
+        d.setMonth(d.getMonth() + 1);
+      }
+    }
+  }
 }
 
 // --- Initialisierung ---
@@ -434,21 +470,9 @@ window.init = async function init() {
 window.openKontoauszugModal = function openKontoauszugModal(postenId) {
   const p = posten.find(x => x.id === postenId);
   if (!p) return;
-  // Raten für diesen Posten sortiert nach Startdatum
-  const ratenList = raten.filter(r => r.posten_id === postenId)
-    .sort((a, b) => new Date(a.start_datum) - new Date(b.start_datum));
-  // Transaktionen für diesen Posten sortiert nach Datum
+  // Nur tatsächlich gebuchte Transaktionen (inkl. automatische Raten)
   const transList = transaktionen.filter(t => t.posten_id === postenId)
     .sort((a, b) => new Date(a.datum) - new Date(b.datum));
-  // Raten als Zeitabschnitte
-  let ratenRows = [];
-  for (let i = 0; i < ratenList.length; i++) {
-    const start = ratenList[i].start_datum;
-    const end = ratenList[i+1] ? ratenList[i+1].start_datum : 'Heute';
-    ratenRows.push(`<tr><td class="py-1 text-xs">${start} – ${end}</td><td class="py-1 text-xs text-right">${ratenList[i].betrag.toFixed(2)} €</td><td></td></tr>`);
-  }
-  // Transaktionen einzeln
-  let transRows = transList.map(t => `<tr><td class="py-1 text-xs">${t.datum}</td><td class="py-1 text-xs text-right">${t.betrag.toFixed(2)} €</td><td class="py-1 text-xs">${t.typ === 'einzahlung' ? 'Einzahlung' : 'Auszahlung'}</td></tr>`);
   // Modal-HTML
   const modalHtml = `
     <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -456,10 +480,9 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
         <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick="document.getElementById('modal-overlay').remove()">✕</button>
         <h2 class="text-lg font-bold mb-4">Kontoauszug: ${p.name}</h2>
         <table class="w-full text-left mb-2">
-          <thead><tr><th>Zeitraum/Datum</th><th>Betrag</th><th>Typ</th></tr></thead>
+          <thead><tr><th>Datum</th><th>Betrag</th><th>Typ</th><th>Notiz</th></tr></thead>
           <tbody>
-            ${ratenRows.join('')}
-            ${transRows.join('')}
+            ${transList.map(t => `<tr><td class="py-1 text-xs">${t.datum}</td><td class="py-1 text-xs text-right">${t.betrag.toFixed(2)} €</td><td class="py-1 text-xs">${t.typ === 'einzahlung' ? 'Einzahlung' : 'Auszahlung'}</td><td class="py-1 text-xs">${t.notiz || ''}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
