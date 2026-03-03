@@ -711,43 +711,45 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
   // 1. Raten: Für jeden Zeitraum zwischen zwei Raten, für jeden Monat eine Einzahlung (Logik wie bei Saldo)
   const ratenList = raten.filter(r => r.posten_id === postenId).sort((a, b) => new Date(a.start_datum) - new Date(b.start_datum));
   let today = new Date();
-  for (let i = 0; i < ratenList.length; i++) {
-    const rate = ratenList[i];
-    const start = new Date(rate.start_datum);
-    let end;
-    if (ratenList[i + 1]) {
-      end = new Date(ratenList[i + 1].start_datum);
-      end.setDate(end.getDate() - 1);
-    } else {
-      end = today;
-    }
-    // Starte immer exakt am Startdatum der Rate
-    let jahr = start.getFullYear();
-    let monat = start.getMonth();
-    let buchungsTag = start.getDate();
-    let buchungsDatum = new Date(jahr, monat, buchungsTag);
-    while (buchungsDatum <= end && buchungsDatum <= today) {
-      // Immer exakt am Tag des Startdatums buchen
-      let aktuellesDatum = new Date(jahr, monat, buchungsTag);
-      if (aktuellesDatum < start) {
-        aktuellesDatum = start;
+    for (let i = 0; i < ratenList.length; i++) {
+      const rate = ratenList[i];
+      const start = new Date(rate.start_datum);
+      let end;
+      if (ratenList[i + 1]) {
+        end = new Date(ratenList[i + 1].start_datum);
+        end.setDate(end.getDate() - 1);
+      } else {
+        end = today;
       }
-      if (aktuellesDatum > end || aktuellesDatum > today) break;
+      let buchungsTag = start.getDate();
+      let jahr = start.getFullYear();
+      let monat = start.getMonth();
+      // 1. Buchung: IMMER das Startdatum der Rate
       buchungen.push({
-        datum: aktuellesDatum.toISOString().slice(0,10),
+        datum: start.toISOString().slice(0,10),
         betrag: Number(rate.betrag),
         typ: 'einzahlung',
         notiz: 'Monatliche Rate'
       });
-      // Nächster Monat
-      monat++;
-      if (monat > 11) {
-        monat = 0;
-        jahr++;
+      // Folgemonate: immer exakt denselben Tag
+      jahr = start.getFullYear();
+      monat = start.getMonth() + 1;
+      while (true) {
+        if (monat > 11) {
+          monat = 0;
+          jahr++;
+        }
+        let aktuellesDatum = new Date(jahr, monat, buchungsTag);
+        if (aktuellesDatum > end || aktuellesDatum > today) break;
+        buchungen.push({
+          datum: aktuellesDatum.toISOString().slice(0,10),
+          betrag: Number(rate.betrag),
+          typ: 'einzahlung',
+          notiz: 'Monatliche Rate'
+        });
+        monat++;
       }
-      buchungsDatum = new Date(jahr, monat, buchungsTag);
     }
-  }
   // 2. Echte Transaktionen: Ein-/Auszahlungen
   const trans = transaktionen.filter(t => t.posten_id === postenId);
   for (const t of trans) {
