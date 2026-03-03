@@ -29,12 +29,10 @@ create table transaktionen (
   notiz text
 );
 
--- Row Level Security (RLS) aktivieren
 alter table posten enable row level security;
 alter table raten enable row level security;
 alter table transaktionen enable row level security;
 
--- Policies: Jeder sieht nur seine eigenen Daten
 create policy "User can manage their own posten" on posten for all using (auth.uid() = user_id);
 create policy "User can manage their own raten" on raten for all using (
   posten_id in (select id from posten where user_id = auth.uid())
@@ -42,3 +40,5 @@ create policy "User can manage their own raten" on raten for all using (
 create policy "User can manage their own transaktionen" on transaktionen for all using (
   posten_id in (select id from posten where user_id = auth.uid())
 );
+-- Einzigartigkeit für "Allgemein" pro Nutzer erzwingen
+ALTER TABLE posten ADD CONSTRAINT unique_user_allgemein UNIQUE (user_id, name);

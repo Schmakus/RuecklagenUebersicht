@@ -98,13 +98,12 @@ function renderDashboard() {
             : "bg-slate-800/50 rounded-xl p-5 flex flex-col gap-4 shadow-md relative";
           const ziel = Number(p.ziel_betrag) || 0;
           const fortschritt = ziel > 0 ? Math.min(100, Math.round((saldo / ziel) * 100)) : 0;
+          const isAllgemein = p.name === 'Allgemein';
           return `
             <div class="${cardClass}" data-posten-id="${p.id}">
               <div class="flex items-center justify-between mb-2">
                 <span class="font-semibold text-lg">${p.name}</span>
-                <button class="edit-posten-btn p-1 ml-2 text-indigo-400 hover:text-indigo-200" title="Bearbeiten">
-                  <i data-lucide="edit-3" class="w-5 h-5"></i>
-                </button>
+                ${!isAllgemein ? `<button class="edit-posten-btn p-1 ml-2 text-indigo-400 hover:text-indigo-200" title="Bearbeiten"><i data-lucide="edit-3" class="w-5 h-5"></i></button>` : ''}
               </div>
               <div class="mb-2">
                 <div class="flex justify-between text-xs mb-1">
@@ -121,7 +120,7 @@ function renderDashboard() {
               <div class="flex gap-2">
                 <button class="show-kontoauszug-btn border border-emerald-600 text-emerald-400 rounded px-3 py-1 text-xs flex-1">Kontoauszug</button>
                 <button class="trans-btn border border-slate-500 text-slate-300 rounded px-3 py-1 text-xs flex-1">Transaktion</button>
-                <button class="rate-btn bg-indigo-600 hover:bg-indigo-700 text-white rounded px-3 py-1 text-xs flex-1">Rate anpassen</button>
+                ${!isAllgemein ? `<button class="rate-btn bg-indigo-600 hover:bg-indigo-700 text-white rounded px-3 py-1 text-xs flex-1">Rate anpassen</button>` : ''}
               </div>
             </div>
           `;
@@ -265,36 +264,45 @@ function openAddPostenModal() {
       </div>
     </div>
   `;
+  // Vorheriges Modal entfernen, falls vorhanden
+  const oldModal = document.getElementById('modal-overlay');
+  if (oldModal) oldModal.remove();
   let modalDiv = document.createElement('div');
   modalDiv.id = 'modal-overlay';
   modalDiv.innerHTML = modalHtml;
   document.body.appendChild(modalDiv);
-  // Vorschlagslogik für Rate
-  setTimeout(() => {
-    const zielInput = document.querySelector('input[name="ziel_betrag"]');
-    const laufzeitInput = document.querySelector('input[name="laufzeit_jahre"]');
-    const rateInput = document.querySelector('input[name="rate_betrag"]');
-    function updateRate() {
-      const ziel = Number(zielInput.value);
-      const jahre = Number(faelligkeitInput.value);
-      if (!isNaN(ziel) && ziel > 0 && !isNaN(jahre) && jahre > 0) {
-        const vorschlag = ziel / (jahre * 12);
-        rateInput.value = vorschlag.toFixed(2);
-      }
+  // Vorschlagslogik für Rate direkt nach dem Einfügen
+  const zielInput = modalDiv.querySelector('input[name="ziel_betrag"]');
+  const laufzeitInput = modalDiv.querySelector('input[name="laufzeit_jahre"]');
+  const rateInput = modalDiv.querySelector('input[name="rate_betrag"]');
+  function updateRate() {
+    const ziel = Number(zielInput.value);
+    const jahre = Number(laufzeitInput.value);
+    if (
+      zielInput.value !== '' && laufzeitInput.value !== '' &&
+      !isNaN(ziel) && ziel > 0 && !isNaN(jahre) && jahre > 0
+    ) {
+      const monate = jahre * 12;
+      const vorschlag = monate > 0 ? ziel / monate : 0;
+      rateInput.value = vorschlag.toFixed(2);
+    } else {
+      rateInput.value = '';
     }
-    zielInput.addEventListener('input', updateRate);
-    faelligkeitInput.addEventListener('input', updateRate);
-    updateRate();
-  }, 0);
+  }
+  zielInput.addEventListener('input', updateRate);
+  laufzeitInput.addEventListener('input', updateRate);
+  rateInput.value = '';
   document.getElementById('add-posten-form').onsubmit = async (e) => {
     e.preventDefault();
-    const name = e.target.name.value.trim();
-    const ziel_betrag = Number(e.target.ziel_betrag.value);
-    const faelligkeit_jahre = Number(e.target.faelligkeit_jahre.value);
-    const faelligkeitsdatum = e.target.faelligkeitsdatum.value;
-    const rate_betrag = Number(e.target.rate_betrag.value);
-    const rate_start_datum = e.target.rate_start_datum.value;
-    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(faelligkeit_jahre) || faelligkeit_jahre < 1 || !faelligkeitsdatum || isNaN(rate_betrag) || rate_betrag <= 0 || !rate_start_datum) {
+    const form = e.target;
+    // Feldnamen exakt wie im HTML-Formular
+    const name = form.elements['name']?.value?.trim() || '';
+    const ziel_betrag = Number(form.elements['ziel_betrag']?.value);
+    const laufzeit_jahre = Number(form.elements['laufzeit_jahre']?.value);
+    const faelligkeitsdatum = form.elements['faelligkeitsdatum']?.value;
+    const rate_betrag = Number(form.elements['rate_betrag']?.value);
+    const rate_start_datum = form.elements['rate_start_datum']?.value;
+    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_jahre) || laufzeit_jahre < 1 || !faelligkeitsdatum || isNaN(rate_betrag) || rate_betrag <= 0 || !rate_start_datum) {
       showToast('Bitte alle Felder korrekt ausfüllen!', 'error');
       return;
     }
@@ -304,7 +312,7 @@ function openAddPostenModal() {
         user_id: user.id,
         name,
         ziel_betrag,
-        faelligkeit_jahre,
+        laufzeit_jahre,
         faelligkeitsdatum
       }).select();
       if (postenErr || !postenRes || !postenRes[0]) throw postenErr || new Error('Fehler beim Anlegen des Postens');
@@ -359,16 +367,16 @@ function openEditPostenModal(postenId) {
             <input name="ziel_betrag" type="number" min="0" step="0.01" value="${postenObj.ziel_betrag}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           <label class="text-sm">Laufzeit (Jahre):
-            <input name="faelligkeit_jahre" type="number" min="1" step="1" value="${postenObj.faelligkeit_jahre}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+            <input name="laufzeit_jahre" type="number" min="1" step="1" value="${postenObj.laufzeit_jahre || postenObj.faelligkeit_jahre || ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           <label class="text-sm">Fälligkeitsdatum:
             <input name="faelligkeitsdatum" type="date" value="${postenObj.faelligkeitsdatum || ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           <label class="text-sm">Startdatum der aktuellen Rate:
-            <input name="rate_start_datum" type="date" value="${aktuelleRate ? aktuelleRate.start_datum : ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+            <input name="rate_start_datum" type="date" value="${aktuelleRate && aktuelleRate.start_datum ? aktuelleRate.start_datum : new Date().toISOString().slice(0,10)}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           <label class="text-sm">Monatliche Rate (€):
-            <input name="rate_betrag" type="number" min="0" step="0.01" value="${aktuelleRate ? aktuelleRate.betrag : ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+            <input name="rate_betrag" type="number" min="0" step="0.01" value="${aktuelleRate && aktuelleRate.betrag ? aktuelleRate.betrag : ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           ${zukunftRate ? `<div class='text-xs text-zinc-400 mt-1'>Nächste geplante Rate ab <span class='font-semibold'>${zukunftRate.start_datum}</span>: <span class='font-semibold'>${zukunftRate.betrag.toFixed(2)} €</span></div>` : ''}
           <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded px-4 py-2 mt-2">Speichern</button>
@@ -383,30 +391,31 @@ function openEditPostenModal(postenId) {
   // Vorschlagslogik für Rate (wie beim Anlegen)
   setTimeout(() => {
     const zielInput = document.querySelector('#edit-posten-form input[name="ziel_betrag"]');
-    const faelligkeitInput = document.querySelector('#edit-posten-form input[name="faelligkeit_jahre"]');
+    const laufzeitInput = document.querySelector('#edit-posten-form input[name="faelligkeit_jahre"]');
     const rateInput = document.querySelector('#edit-posten-form input[name="rate_betrag"]');
     function updateRate() {
       const ziel = Number(zielInput.value);
-      const jahre = Number(faelligkeitInput.value);
+      const jahre = Number(laufzeitInput.value);
       if (!isNaN(ziel) && ziel > 0 && !isNaN(jahre) && jahre > 0) {
         const vorschlag = ziel / (jahre * 12);
         rateInput.value = vorschlag.toFixed(2);
       }
     }
     zielInput.addEventListener('input', updateRate);
-    faelligkeitInput.addEventListener('input', updateRate);
+    laufzeitInput.addEventListener('input', updateRate);
     // Nur vorschlagen, wenn keine aktuelle Rate vorhanden ist
     if (!rateInput.value || rateInput.value === '0') updateRate();
   }, 0);
   document.getElementById('edit-posten-form').onsubmit = async (e) => {
     e.preventDefault();
-    const name = e.target.name.value.trim();
-    const ziel_betrag = Number(e.target.ziel_betrag.value);
-    const faelligkeit_jahre = Number(e.target.faelligkeit_jahre.value);
-    const faelligkeitsdatum = e.target.faelligkeitsdatum.value;
-    const rate_betrag = Number(e.target.rate_betrag.value);
-    const rate_start_datum = e.target.rate_start_datum.value;
-    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(faelligkeit_jahre) || faelligkeit_jahre < 1 || !faelligkeitsdatum || isNaN(rate_betrag) || rate_betrag <= 0 || !rate_start_datum) {
+    const form = e.target;
+    const name = form.elements['name']?.value?.trim() || '';
+    const ziel_betrag = Number(form.elements['ziel_betrag']?.value);
+    const laufzeit_jahre = Number(form.elements['laufzeit_jahre']?.value);
+    const faelligkeitsdatum = form.elements['faelligkeitsdatum']?.value;
+    const rate_betrag = Number(form.elements['rate_betrag']?.value);
+    const rate_start_datum = form.elements['rate_start_datum']?.value;
+    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_jahre) || laufzeit_jahre < 1 || !faelligkeitsdatum || isNaN(rate_betrag) || rate_betrag <= 0 || !rate_start_datum) {
       showToast('Bitte alle Felder korrekt ausfüllen!', 'error');
       return;
     }
@@ -414,7 +423,7 @@ function openEditPostenModal(postenId) {
       await supabase.from('posten').update({
         name,
         ziel_betrag,
-        faelligkeit_jahre,
+        laufzeit_jahre,
         faelligkeitsdatum
       }).eq('id', postenId);
       // Update aktuelle Rate
@@ -464,6 +473,33 @@ async function loadData() {
     .eq('user_id', user.id)
     .order('name');
   posten = postenData || [];
+  // Prüfe, ob "Allgemein" existiert, sonst anlegen
+  // Zusätzliche DB-Prüfung, ob "Allgemein" existiert
+  const { data: checkAllgemein } = await supabase
+    .from('posten')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('name', 'Allgemein');
+  if (!checkAllgemein || checkAllgemein.length === 0) {
+    try {
+      await supabase.from('posten').insert({
+        user_id: user.id,
+        name: 'Allgemein',
+        ziel_betrag: 0,
+        laufzeit_jahre: 0,
+        faelligkeitsdatum: new Date().toISOString().slice(0,10)
+      });
+    } catch (err) {
+      // Fehler ignorieren, falls Unique-Constraint verletzt wird
+    }
+    // Nach Anlage: Daten neu laden
+    const { data: postenData2 } = await supabase
+      .from('posten')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name');
+    posten = postenData2 || [];
+  }
   // Raten
   const { data: ratenData } = await supabase
     .from('raten')
