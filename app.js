@@ -118,29 +118,49 @@ let transaktionen = [];
  * @returns {number}
  */
 window.berechnePostenSaldo = function(postenId) {
-  // Berechne dynamisch alle Raten für jeden Monat im jeweiligen Zeitraum
   let saldo = 0;
-  // 1. Raten: Für jeden Zeitraum zwischen zwei Raten, für jeden Monat eine Einzahlung
-  const ratenList = raten.filter(r => r.posten_id === postenId).sort((a, b) => new Date(a.start_datum) - new Date(b.start_datum));
-  let today = new Date();
+  const today = new Date();
+  // Raten filtern und sortieren
+  const ratenList = raten
+    .filter(r => r.posten_id === postenId)
+    .sort((a, b) => new Date(a.start_datum) - new Date(b.start_datum));
+
+  if (ratenList.length === 0) return saldo;
+
   for (let i = 0; i < ratenList.length; i++) {
     const rate = ratenList[i];
     const start = new Date(rate.start_datum);
-    const end = ratenList[i+1] ? new Date(ratenList[i+1].start_datum) : today;
-    let current = new Date(start);
-    while (current <= end && current <= today) {
-      // Immer am gewünschten Tag buchen, falls der Tag existiert, sonst letzten Tag des Monats
-      let buchungsTag = start.getDate();
-      let buchungsDatum = new Date(current.getFullYear(), current.getMonth(), buchungsTag);
-      // Falls der gewünschte Tag nicht existiert (z.B. 31. Februar), dann letzten Tag des Monats nehmen
-      if (buchungsDatum.getMonth() !== current.getMonth()) {
-        buchungsDatum = new Date(current.getFullYear(), current.getMonth() + 1, 0); // letzter Tag des Monats
+    // Enddatum: Entweder einen Tag vor der nächsten Rate, oder heute (inklusive!)
+    let end;
+    if (ratenList[i + 1]) {
+      end = new Date(ratenList[i + 1].start_datum);
+      end.setDate(end.getDate() - 1); // Bis zum Tag vor der nächsten Rate
+    } else {
+      end = today;
+    }
+
+    // Beginne mit dem ersten Buchungsdatum (immer Startdatum)
+    let jahr = start.getFullYear();
+    let monat = start.getMonth();
+    let buchungsTag = start.getDate();
+    let first = true;
+    while (true) {
+      let tageImMonat = new Date(jahr, monat + 1, 0).getDate();
+      let tatsaechlicherTag = Math.min(buchungsTag, tageImMonat);
+      let aktuellesDatum = new Date(jahr, monat, tatsaechlicherTag);
+      if (aktuellesDatum < start) {
+        // Falls z.B. 31. Februar, dann Monatsende nehmen
+        aktuellesDatum = new Date(jahr, monat + 1, 0);
       }
-      if (buchungsDatum >= start && buchungsDatum <= end && buchungsDatum <= today) {
-        saldo += Number(rate.betrag);
-      }
+      if (aktuellesDatum > end || aktuellesDatum > today) break;
+      saldo += Number(rate.betrag);
       // Nächster Monat
-      current.setMonth(current.getMonth() + 1);
+      monat++;
+      if (monat > 11) {
+        monat = 0;
+        jahr++;
+      }
+      first = false;
     }
   }
   // 2. Echte Transaktionen: Ein-/Auszahlungen

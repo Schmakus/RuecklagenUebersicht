@@ -29,6 +29,11 @@ Die Berechnung erfolgt dynamisch im Frontend.
 1. Berechne für jede `rate` die vergangenen Monate: `heute - start_datum`.
 2. `Saldo = (Summe Raten * Monate) + (Summe Einzahlungen) - (Summe Auszahlungen)`.
 
+- **Ratenberechnung:** Zeiträume zwischen Ratenänderungen müssen exklusiv behandelt werden. Wenn `Rate B` am 01.07. startet, muss der Zeitraum von `Rate A` am 30.06. enden, um Doppelbuchungen zu vermeiden.
+- **Monatliche Zyklen:** Bei monatlichen Berechnungen ist der `start_datum.getDate()` als Fixpunkt zu nutzen. 
+- **Monatsende-Handling:** Falls ein Fixpunkt (z.B. 31.) im Folgemonat nicht existiert (z.B. Februar), muss automatisch der letzte Tag des Monats gewählt werden.
+- **Saldo-Logik:** Berechnungen müssen immer dynamisch vom `start_datum` bis zum `today` (oder einem definierten `limit`) laufen, wobei jede Rate nur ihren eigenen Zeitraum (bis zur Ablösung durch eine neue Rate) bedient.
+
 ### B. Umbuchungs-Automatik (Logic-Guard)
 - **Trigger:** Löschen einer Auszahlung ODER Löschen eines Postens, wenn ein Restbetrag > 0 existiert.
 - **Aktion:** Der verbleibende Betrag wird automatisch als 'einzahlung' auf einen System-Posten namens **"Allgemein"** verschoben.
@@ -74,3 +79,8 @@ Orientierung am modernen "Dark-Slate" Dashboard-Look.
 **Status:** Dokumentation finalisiert. Einsatzbereit für (Neu-)Entwicklung.
 
 - [x] Visuelles Feedback (Toasts) für alle DB-Aktionen.
+
+## 7. Kritische Logik-Vorgaben (Legacy Fixes)
+- **Vermeide Zeitraum-Iteration:** Bei monatlichen Berechnungen (Raten/Zinsen) darf nicht in "Blöcken" (Rate A von X bis Y) gerechnet werden. 
+- **Nutze Zeitstrahl-Iteration:** Iteriere stattdessen Monat für Monat über eine `while`-Schleife und ermittle pro Iterationsschritt die zu diesem Zeitpunkt gültige Entität (z.B. mittels `.find()` auf einer sortierten Liste).
+- **Datum-Stabilität:** Bei `new Date()` Operationen in Schleifen muss immer erst das Jahr und der Monat gesetzt werden, und danach der Tag via `Math.min(zielTag, tageImMonat)`, um den "31. Februar"-Bug zu vermeiden.
