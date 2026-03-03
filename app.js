@@ -248,8 +248,8 @@ function openAddPostenModal() {
           <label class="text-sm">Zielbetrag (€):
             <input name="ziel_betrag" type="number" min="0" step="0.01" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
-          <label class="text-sm">Fälligkeit (Jahre):
-            <input name="faelligkeit_jahre" type="number" min="1" step="1" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+          <label class="text-sm">Laufzeit (Jahre):
+            <input name="laufzeit_jahre" type="number" min="1" step="1" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           <label class="text-sm">Fälligkeitsdatum:
             <input name="faelligkeitsdatum" type="date" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
@@ -272,7 +272,7 @@ function openAddPostenModal() {
   // Vorschlagslogik für Rate
   setTimeout(() => {
     const zielInput = document.querySelector('input[name="ziel_betrag"]');
-    const faelligkeitInput = document.querySelector('input[name="faelligkeit_jahre"]');
+    const laufzeitInput = document.querySelector('input[name="laufzeit_jahre"]');
     const rateInput = document.querySelector('input[name="rate_betrag"]');
     function updateRate() {
       const ziel = Number(zielInput.value);
@@ -358,7 +358,7 @@ function openEditPostenModal(postenId) {
           <label class="text-sm">Zielbetrag (€):
             <input name="ziel_betrag" type="number" min="0" step="0.01" value="${postenObj.ziel_betrag}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
-          <label class="text-sm">Fälligkeit (Jahre):
+          <label class="text-sm">Laufzeit (Jahre):
             <input name="faelligkeit_jahre" type="number" min="1" step="1" value="${postenObj.faelligkeit_jahre}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           <label class="text-sm">Fälligkeitsdatum:
@@ -380,6 +380,24 @@ function openEditPostenModal(postenId) {
   modalDiv.id = 'modal-overlay';
   modalDiv.innerHTML = modalHtml;
   document.body.appendChild(modalDiv);
+  // Vorschlagslogik für Rate (wie beim Anlegen)
+  setTimeout(() => {
+    const zielInput = document.querySelector('#edit-posten-form input[name="ziel_betrag"]');
+    const faelligkeitInput = document.querySelector('#edit-posten-form input[name="faelligkeit_jahre"]');
+    const rateInput = document.querySelector('#edit-posten-form input[name="rate_betrag"]');
+    function updateRate() {
+      const ziel = Number(zielInput.value);
+      const jahre = Number(faelligkeitInput.value);
+      if (!isNaN(ziel) && ziel > 0 && !isNaN(jahre) && jahre > 0) {
+        const vorschlag = ziel / (jahre * 12);
+        rateInput.value = vorschlag.toFixed(2);
+      }
+    }
+    zielInput.addEventListener('input', updateRate);
+    faelligkeitInput.addEventListener('input', updateRate);
+    // Nur vorschlagen, wenn keine aktuelle Rate vorhanden ist
+    if (!rateInput.value || rateInput.value === '0') updateRate();
+  }, 0);
   document.getElementById('edit-posten-form').onsubmit = async (e) => {
     e.preventDefault();
     const name = e.target.name.value.trim();
