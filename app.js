@@ -706,89 +706,119 @@ window.init = async function init() {
 window.openKontoauszugModal = function openKontoauszugModal(postenId) {
   const p = posten.find(x => x.id === postenId);
   if (!p) return;
-  // Dynamisch: Alle Raten als monatliche Einzahlungen + echte Transaktionen
+
+  // Hilfsfunktion: Formatiert ein Datumsobjekt zu YYYY-MM-DD (Lokalzeit)
+  const formatLocalDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   let buchungen = [];
-  // 1. Raten: Für jeden Zeitraum zwischen zwei Raten, für jeden Monat eine Einzahlung (Logik wie bei Saldo)
-  const ratenList = raten.filter(r => r.posten_id === postenId).sort((a, b) => new Date(a.start_datum) - new Date(b.start_datum));
+  const ratenList = raten
+    .filter(r => r.posten_id === postenId)
+    .sort((a, b) => new Date(a.start_datum) - new Date(b.start_datum));
+  
   let today = new Date();
-    for (let i = 0; i < ratenList.length; i++) {
-      const rate = ratenList[i];
-      const start = new Date(rate.start_datum);
-      let end;
-      if (ratenList[i + 1]) {
-        end = new Date(ratenList[i + 1].start_datum);
-        end.setDate(end.getDate() - 1);
-      } else {
-        end = today;
-      }
-      let buchungsTag = start.getDate();
-      let jahr = start.getFullYear();
-      let monat = start.getMonth();
-      // 1. Buchung: IMMER das Startdatum der Rate
+
+  for (let i = 0; i < ratenList.length; i++) {
+    const rate = ratenList[i];
+    const start = new Date(rate.start_datum);
+    let end;
+
+    if (ratenList[i + 1]) {
+      end = new Date(ratenList[i + 1].start_datum);
+      end.setDate(end.getDate() - 1);
+    } else {
+      end = today;
+    }
+
+    // Wir starten beim Monat/Jahr des Raten-Beginns
+    let folgeJahr = start.getFullYear();
+    let folgeMonat = start.getMonth();
+    let folgeTag = start.getDate();
+
+    while (true) {
+      let aktuellesDatum = new Date(folgeJahr, folgeMonat, folgeTag);
+
+      // Abbruch, wenn das Datum über den Gültigkeitsbereich der Rate oder "Heute" hinausgeht
+      if (aktuellesDatum > end || aktuellesDatum > today) break;
+
       buchungen.push({
-        datum: start.toISOString().slice(0,10),
+        datum: formatLocalDate(aktuellesDatum), // Korrektur: Nutzt lokale Zeit statt ISO
         betrag: Number(rate.betrag),
         typ: 'einzahlung',
         notiz: 'Monatliche Rate'
       });
-      // Folgemonate: immer exakt denselben Tag
-      let folgeJahr = start.getFullYear();
-      let folgeMonat = start.getMonth();
-      let folgeTag = start.getDate();
-      while (true) {
-        folgeMonat++;
-        if (folgeMonat > 11) {
-          folgeMonat = 0;
-          folgeJahr++;
-        }
-        let aktuellesDatum = new Date(folgeJahr, folgeMonat, folgeTag);
-        if (aktuellesDatum > end || aktuellesDatum > today) break;
-        buchungen.push({
-          datum: aktuellesDatum.toISOString().slice(0,10),
-          betrag: Number(rate.betrag),
-          typ: 'einzahlung',
-          notiz: 'Monatliche Rate'
-        });
+
+      // Erhöhe Monat für den nächsten Durchlauf
+      folgeMonat++;
+      if (folgeMonat > 11) {
+        folgeMonat = 0;
+        folgeJahr++;
       }
     }
-  // 2. Echte Transaktionen: Ein-/Auszahlungen
+  }
+
+  // 2. Echte Transaktionen hinzufügen
   const trans = transaktionen.filter(t => t.posten_id === postenId);
   for (const t of trans) {
     buchungen.push({
-      datum: t.datum,
+      datum: t.datum, // Liegt bereits als String vor
       betrag: Number(t.betrag),
       typ: t.typ,
       notiz: t.notiz || ''
     });
   }
+
   // Sortiere alle Buchungen nach Datum
   buchungen.sort((a, b) => new Date(a.datum) - new Date(b.datum));
+
   // Summenberechnung
   let summe = 0;
   for (const t of buchungen) {
     if (t.typ === 'einzahlung') summe += Number(t.betrag);
     else if (t.typ === 'auszahlung') summe -= Number(t.betrag);
   }
+
   const modalHtml = `
-    <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div class="bg-slate-900 rounded-xl p-6 w-full max-w-md shadow-lg relative">
-        <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick=\"document.getElementById('modal-overlay').remove()\">✕</button>
+    <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" id="modal-overlay">
+      <div class="bg-slate-900 rounded-xl p-6 w-full max-w-md shadow-lg relative text-white">
+        <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick="document.getElementById('modal-overlay').remove()">✕</button>
         <h2 class="text-lg font-bold mb-4">Kontoauszug: ${p.name}</h2>
-        <table class="w-full text-left mb-2">
-          <thead><tr><th>Datum</th><th>Betrag</th><th>Typ</th><th>Notiz</th></tr></thead>
-          <tbody>
-            ${buchungen.map(t => `<tr><td class="py-1 text-xs">${t.datum}</td><td class="py-1 text-xs text-right">${t.betrag.toFixed(2)} €</td><td class="py-1 text-xs">${t.typ === 'einzahlung' ? 'Einzahlung' : 'Auszahlung'}</td><td class="py-1 text-xs">${t.notiz || ''}</td></tr>`).join('')}
-          </tbody>
-        </table>
-        <div class="mt-2 text-right font-semibold text-zinc-200">Summe: <span class="font-mono">${summe.toFixed(2)} €</span></div>
+        <div class="max-h-[60vh] overflow-y-auto">
+          <table class="w-full text-left mb-2">
+            <thead>
+              <tr class="border-b border-zinc-700">
+                <th class="py-2 text-xs uppercase text-zinc-400">Datum</th>
+                <th class="py-2 text-xs uppercase text-zinc-400 text-right">Betrag</th>
+                <th class="py-2 text-xs uppercase text-zinc-400">Typ</th>
+                <th class="py-2 text-xs uppercase text-zinc-400">Notiz</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${buchungen.map(t => `
+                <tr class="border-b border-zinc-800/50">
+                  <td class="py-2 text-xs">${t.datum}</td>
+                  <td class="py-2 text-xs text-right font-mono">${t.betrag.toFixed(2)} €</td>
+                  <td class="py-2 text-xs text-zinc-400">${t.typ === 'einzahlung' ? 'Einzahlung' : 'Auszahlung'}</td>
+                  <td class="py-2 text-xs text-zinc-500 italic">${t.notiz || ''}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 pt-4 border-t border-zinc-700 text-right font-semibold text-zinc-200">
+          Summe: <span class="font-mono text-xl text-white ml-2">${summe.toFixed(2)} €</span>
+        </div>
       </div>
     </div>
   `;
+
   let modalDiv = document.createElement('div');
-  modalDiv.id = 'modal-overlay';
   modalDiv.innerHTML = modalHtml;
-  document.body.appendChild(modalDiv);
-}
+  document.body.appendChild(modalDiv.firstElementChild);
+};
 
 // Handler für Kontoauszug-Button (nur einmal, nach Funktionsdefinition)
 document.addEventListener('click', (e) => {
