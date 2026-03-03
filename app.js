@@ -58,6 +58,22 @@ let posten = [];
 let raten = [];
 let transaktionen = [];
 
+/**
+ * Berechnet den aktuellen Saldo eines Postens anhand aller gebuchten Transaktionen (inkl. automatischer Raten)
+ * @param {string} postenId
+ * @returns {number}
+ */
+window.berechnePostenSaldo = function(postenId) {
+  // Nur gebuchte Transaktionen für diesen Posten
+  const trans = transaktionen.filter(t => t.posten_id === postenId);
+  let saldo = 0;
+  for (const t of trans) {
+    if (t.typ === 'einzahlung') saldo += Number(t.betrag);
+    else if (t.typ === 'auszahlung') saldo -= Number(t.betrag);
+  }
+  return saldo;
+};
+
 // --- Editieren-Button in Card und Handler ---
 function renderDashboard() {
   const app = document.getElementById('app');
@@ -510,7 +526,12 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
   // Nur tatsächlich gebuchte Transaktionen (inkl. automatische Raten)
   const transList = transaktionen.filter(t => t.posten_id === postenId)
     .sort((a, b) => new Date(a.datum) - new Date(b.datum));
-  // Modal-HTML identisch zu Transaktions-Modal
+  // Summenberechnung
+  let summe = 0;
+  for (const t of transList) {
+    if (t.typ === 'einzahlung') summe += Number(t.betrag);
+    else if (t.typ === 'auszahlung') summe -= Number(t.betrag);
+  }
   const modalHtml = `
     <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div class="bg-slate-900 rounded-xl p-6 w-full max-w-md shadow-lg relative">
@@ -522,6 +543,7 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
             ${transList.map(t => `<tr><td class="py-1 text-xs">${t.datum}</td><td class="py-1 text-xs text-right">${t.betrag.toFixed(2)} €</td><td class="py-1 text-xs">${t.typ === 'einzahlung' ? 'Einzahlung' : 'Auszahlung'}</td><td class="py-1 text-xs">${t.notiz || ''}</td></tr>`).join('')}
           </tbody>
         </table>
+        <div class="mt-2 text-right font-semibold text-zinc-200">Summe: <span class="font-mono">${summe.toFixed(2)} €</span></div>
       </div>
     </div>
   `;
