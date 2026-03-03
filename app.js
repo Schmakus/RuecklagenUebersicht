@@ -127,17 +127,20 @@ window.berechnePostenSaldo = function(postenId) {
     const rate = ratenList[i];
     const start = new Date(rate.start_datum);
     const end = ratenList[i+1] ? new Date(ratenList[i+1].start_datum) : today;
-    let d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    while (d <= end && d <= today) {
-      const buchungsTag = start.getDate();
-      const buchungsDatum = new Date(d.getFullYear(), d.getMonth(), buchungsTag);
-      if (buchungsDatum < start) {
-        d.setMonth(d.getMonth() + 1);
-        continue;
+    let current = new Date(start);
+    while (current <= end && current <= today) {
+      // Immer am gewünschten Tag buchen, falls der Tag existiert, sonst letzten Tag des Monats
+      let buchungsTag = start.getDate();
+      let buchungsDatum = new Date(current.getFullYear(), current.getMonth(), buchungsTag);
+      // Falls der gewünschte Tag nicht existiert (z.B. 31. Februar), dann letzten Tag des Monats nehmen
+      if (buchungsDatum.getMonth() !== current.getMonth()) {
+        buchungsDatum = new Date(current.getFullYear(), current.getMonth() + 1, 0); // letzter Tag des Monats
       }
-      if (buchungsDatum > today || buchungsDatum >= end) break;
-      saldo += Number(rate.betrag);
-      d.setMonth(d.getMonth() + 1);
+      if (buchungsDatum >= start && buchungsDatum <= end && buchungsDatum <= today) {
+        saldo += Number(rate.betrag);
+      }
+      // Nächster Monat
+      current.setMonth(current.getMonth() + 1);
     }
   }
   // 2. Echte Transaktionen: Ein-/Auszahlungen
