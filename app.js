@@ -792,11 +792,13 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
     });
   }
   // Sortiere alle Buchungen nach Datum
-  allBuchungen.sort((a, b) => new Date(a.datum) - new Date(b.datum));
+  // Sortiere alle Buchungen nach Datum (neuste zuerst)
+  allBuchungen.sort((a, b) => new Date(b.datum) - new Date(a.datum));
 
   // Initial filter values
-  let minDate = allBuchungen.length ? allBuchungen[0].datum : formatLocalDate(today);
-  let maxDate = allBuchungen.length ? allBuchungen[allBuchungen.length-1].datum : formatLocalDate(today);
+  // Achtung: Sortierung ist jetzt absteigend (neuste zuerst)
+  let maxDate = allBuchungen.length ? allBuchungen[0].datum : formatLocalDate(today);
+  let minDate = allBuchungen.length ? allBuchungen[allBuchungen.length-1].datum : formatLocalDate(today);
 
   // Render function for modal content
   function renderKontoauszugContent(von, bis) {
@@ -807,6 +809,46 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
       if (t.typ === 'einzahlung') summe += Number(t.betrag);
       else if (t.typ === 'auszahlung') summe -= Number(t.betrag);
     }
+    // Pagination logic
+    const pageSize = 14;
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    let page = window.__kontoauszugPage || 1;
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    const startIdx = (page - 1) * pageSize;
+    const endIdx = startIdx + pageSize;
+    const pageEntries = filtered.slice(startIdx, endIdx);
+
+    // Pagination buttons logic
+    function renderPagination() {
+      if (totalPages <= 1) return '';
+      let btns = [];
+      // Always show 4 pages, use ... if needed
+      if (totalPages <= 4) {
+        for (let i = 1; i <= totalPages; i++) {
+          btns.push(i);
+        }
+      } else {
+        if (page <= 2) {
+          btns = [1,2,3,4,'...'];
+        } else if (page >= totalPages-1) {
+          btns = ['...', totalPages-3, totalPages-2, totalPages-1, totalPages];
+        } else {
+          btns = ['...', page-1, page, page+1, '...'];
+        }
+      }
+      return `
+        <div class="flex gap-2 justify-center mt-4 mb-2">
+          <button class="px-2 py-1 w-16 rounded bg-slate-800 text-zinc-300 border border-slate-700" data-page="prev" ${page === 1 ? 'disabled' : ''}>Zurück</button>
+          ${btns.map(b => {
+            if (b === '...') return `<span class="px-2 text-zinc-500">...</span>`;
+            return `<button class="px-2 py-1 w-8 rounded ${b === page ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-zinc-300'} border border-slate-700" data-page="${b}">${b}</button>`;
+          }).join('')}
+          <button class="px-2 py-1 w-16 rounded bg-slate-800 text-zinc-300 border border-slate-700" data-page="next" ${page === totalPages ? 'disabled' : ''}>Vor</button>
+        </div>
+      `;
+    }
+
     return `
       <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick="document.getElementById('modal-overlay').remove()">✕</button>
       <h2 class="text-lg font-bold mb-4">Kontoauszug: ${p.name}</h2>
@@ -831,7 +873,7 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
             </tr>
           </thead>
           <tbody>
-            ${filtered.map(t => `
+            ${pageEntries.map(t => `
               <tr class="border-b border-zinc-800/50">
                 <td class="py-2 text-xs">${t.datum}</td>
                 <td class="py-2 text-xs text-right font-mono">${t.betrag.toFixed(2)} €</td>
@@ -841,6 +883,7 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
           </tbody>
         </table>
       </div>
+      ${renderPagination()}
       <div class="mt-4 pt-4 border-t border-zinc-700 text-right font-semibold text-zinc-200">
         Summe: <span class="font-mono text-xl text-white ml-2">${summe.toFixed(2)} €</span>
       </div>
@@ -873,13 +916,33 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
     const von = modalContent.querySelector('#konto-von').value;
     const bis = modalContent.querySelector('#konto-bis').value;
     modalContent.innerHTML = renderKontoauszugContent(von, bis);
-    // Re-attach listeners after re-render
     attachListeners();
   }
   function attachListeners() {
-    modalContent.querySelector('#konto-von').addEventListener('change', updateFilter);
-    modalContent.querySelector('#konto-bis').addEventListener('change', updateFilter);
+    modalContent.querySelector('#konto-von').addEventListener('change', () => {
+      window.__kontoauszugPage = 1;
+      updateFilter();
+    });
+    modalContent.querySelector('#konto-bis').addEventListener('change', () => {
+      window.__kontoauszugPage = 1;
+      updateFilter();
+    });
     modalContent.querySelector('button[onclick]')?.addEventListener('click', () => overlay.remove());
+    // Pagination buttons
+    modalContent.querySelectorAll('button[data-page]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        let page = window.__kontoauszugPage || 1;
+        const totalPages = Math.max(1, Math.ceil(allBuchungen.filter(t => t.datum >= modalContent.querySelector('#konto-von').value && t.datum <= modalContent.querySelector('#konto-bis').value).length / 14));
+        if (btn.dataset.page === 'prev' && page > 1) {
+          window.__kontoauszugPage = page - 1;
+        } else if (btn.dataset.page === 'next' && page < totalPages) {
+          window.__kontoauszugPage = page + 1;
+        } else if (!isNaN(Number(btn.dataset.page))) {
+          window.__kontoauszugPage = Number(btn.dataset.page);
+        }
+        updateFilter();
+      });
+    });
   }
   attachListeners();
 };
