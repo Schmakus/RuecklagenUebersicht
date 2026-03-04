@@ -81,6 +81,7 @@ function renderAuth() {
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="flex flex-col items-center justify-center min-h-screen">
+      <img src="./icons/favicon.svg" alt="Logo" class="w-16 h-16 mb-4 drop-shadow-lg">
       <h1 class="text-3xl font-bold mb-6">Rücklagen-Planer</h1>
       <form id="login-form" class="flex flex-col gap-4 w-80 bg-slate-800/50 p-8 rounded-xl shadow-lg">
         <input name="email" type="email" placeholder="E-Mail" required class="rounded bg-slate-900 border border-slate-700 px-3 py-2 text-zinc-100" />
