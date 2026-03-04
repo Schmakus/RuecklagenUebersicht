@@ -268,6 +268,22 @@ function openRateModal(postenId) {
   modalDiv.id = 'modal-overlay';
   modalDiv.innerHTML = modalHtml;
   document.body.appendChild(modalDiv);
+  // Klick außerhalb des Modal-Inhalts schließt das Modal
+  const overlayEl = document.getElementById('modal-overlay');
+  overlayEl.addEventListener('click', (e) => {
+    if (e.target === overlayEl) {
+      overlayEl.remove();
+    }
+  });
+  // Klick außerhalb des Modal-Inhalts schließt das Modal
+  modalDiv.addEventListener('click', (e) => {
+    if (
+      e.target === modalDiv ||
+      (e.target.classList && e.target.classList.contains('fixed') && e.target.classList.contains('inset-0'))
+    ) {
+      modalDiv.remove();
+    }
+  });
   document.getElementById('rate-form').onsubmit = async (e) => {
     e.preventDefault();
     const betrag = Number(e.target.betrag.value);
@@ -368,6 +384,16 @@ function openTransModal(postenId) {
   modalDiv.id = 'modal-overlay';
   modalDiv.innerHTML = modalHtml;
   document.body.appendChild(modalDiv);
+  // Klick außerhalb des Modal-Inhalts schließt das Modal
+  modalDiv.addEventListener('click', (e) => {
+    // Schließe Modal, wenn auf das Overlay oder einen Bereich mit Overlay-Klasse geklickt wird
+    if (
+      e.target === modalDiv ||
+      (e.target.classList && e.target.classList.contains('fixed') && e.target.classList.contains('inset-0'))
+    ) {
+      modalDiv.remove();
+    }
+  });
   document.getElementById('trans-form').onsubmit = async (e) => {
     e.preventDefault();
     const betrag = Number(e.target.betrag.value);
@@ -788,7 +814,7 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
 
   const modalHtml = `
     <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" id="modal-overlay">
-      <div class="bg-slate-900 rounded-xl p-6 w-full max-w-md shadow-lg relative text-white">
+      <div class="bg-slate-900 rounded-xl p-6 w-full max-w-md shadow-lg relative text-white" id="modal-content">
         <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick="document.getElementById('modal-overlay').remove()">✕</button>
         <h2 class="text-lg font-bold mb-4">Kontoauszug: ${p.name}</h2>
         <div class="max-h-[60vh] overflow-y-auto">
@@ -821,7 +847,14 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
 
   let modalDiv = document.createElement('div');
   modalDiv.innerHTML = modalHtml;
-  document.body.appendChild(modalDiv.firstElementChild);
+  const overlay = modalDiv.firstElementChild;
+  document.body.appendChild(overlay);
+  // Click-outside-to-close logic
+  overlay.addEventListener('mousedown', function(e) {
+    if (e.target === overlay) {
+      overlay.remove();
+    }
+  });
 };
 
 // Handler für Kontoauszug-Button (nur einmal, nach Funktionsdefinition)
