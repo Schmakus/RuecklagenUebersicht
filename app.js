@@ -745,44 +745,35 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
     return `${year}-${month}-${day}`;
   };
 
-  let buchungen = [];
+  // Default filter: Von = earliest, Bis = today
+  let allBuchungen = [];
   const ratenList = raten
     .filter(r => r.posten_id === postenId)
     .sort((a, b) => new Date(a.start_datum) - new Date(b.start_datum));
-  
   let today = new Date();
 
   for (let i = 0; i < ratenList.length; i++) {
     const rate = ratenList[i];
     const start = new Date(rate.start_datum);
     let end;
-
     if (ratenList[i + 1]) {
       end = new Date(ratenList[i + 1].start_datum);
       end.setDate(end.getDate() - 1);
     } else {
       end = today;
     }
-
-    // Wir starten beim Monat/Jahr des Raten-Beginns
     let folgeJahr = start.getFullYear();
     let folgeMonat = start.getMonth();
     let folgeTag = start.getDate();
-
     while (true) {
       let aktuellesDatum = new Date(folgeJahr, folgeMonat, folgeTag);
-
-      // Abbruch, wenn das Datum über den Gültigkeitsbereich der Rate oder "Heute" hinausgeht
       if (aktuellesDatum > end || aktuellesDatum > today) break;
-
-      buchungen.push({
-        datum: formatLocalDate(aktuellesDatum), // Korrektur: Nutzt lokale Zeit statt ISO
+      allBuchungen.push({
+        datum: formatLocalDate(aktuellesDatum),
         betrag: Number(rate.betrag),
         typ: 'einzahlung',
         notiz: 'Monatliche Rate'
       });
-
-      // Erhöhe Monat für den nächsten Durchlauf
       folgeMonat++;
       if (folgeMonat > 11) {
         folgeMonat = 0;
@@ -790,57 +781,77 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
       }
     }
   }
-
   // 2. Echte Transaktionen hinzufügen
   const trans = transaktionen.filter(t => t.posten_id === postenId);
   for (const t of trans) {
-    buchungen.push({
-      datum: t.datum, // Liegt bereits als String vor
+    allBuchungen.push({
+      datum: t.datum,
       betrag: Number(t.betrag),
       typ: t.typ,
       notiz: t.notiz || ''
     });
   }
-
   // Sortiere alle Buchungen nach Datum
-  buchungen.sort((a, b) => new Date(a.datum) - new Date(b.datum));
+  allBuchungen.sort((a, b) => new Date(a.datum) - new Date(b.datum));
 
-  // Summenberechnung
-  let summe = 0;
-  for (const t of buchungen) {
-    if (t.typ === 'einzahlung') summe += Number(t.betrag);
-    else if (t.typ === 'auszahlung') summe -= Number(t.betrag);
+  // Initial filter values
+  let minDate = allBuchungen.length ? allBuchungen[0].datum : formatLocalDate(today);
+  let maxDate = allBuchungen.length ? allBuchungen[allBuchungen.length-1].datum : formatLocalDate(today);
+
+  // Render function for modal content
+  function renderKontoauszugContent(von, bis) {
+    // Filtered Buchungen
+    const filtered = allBuchungen.filter(t => t.datum >= von && t.datum <= bis);
+    let summe = 0;
+    for (const t of filtered) {
+      if (t.typ === 'einzahlung') summe += Number(t.betrag);
+      else if (t.typ === 'auszahlung') summe -= Number(t.betrag);
+    }
+    return `
+      <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick="document.getElementById('modal-overlay').remove()">✕</button>
+      <h2 class="text-lg font-bold mb-4">Kontoauszug: ${p.name}</h2>
+      <div class="flex gap-2 mb-4">
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1" for="konto-von">Von</label>
+          <input type="date" id="konto-von" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-zinc-100" value="${von}" min="${minDate}" max="${maxDate}">
+        </div>
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1" for="konto-bis">Bis</label>
+          <input type="date" id="konto-bis" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-zinc-100" value="${bis}" min="${minDate}" max="${maxDate}">
+        </div>
+      </div>
+      <div class="max-h-[60vh] overflow-y-auto">
+        <table class="w-full text-left mb-2">
+          <thead>
+            <tr class="border-b border-zinc-700">
+              <th class="py-2 text-xs uppercase text-zinc-400">Datum</th>
+              <th class="py-2 text-xs uppercase text-zinc-400 text-right">Betrag</th>
+              <th class="py-2 text-xs uppercase text-zinc-400">Typ</th>
+              <th class="py-2 text-xs uppercase text-zinc-400">Notiz</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(t => `
+              <tr class="border-b border-zinc-800/50">
+                <td class="py-2 text-xs">${t.datum}</td>
+                <td class="py-2 text-xs text-right font-mono">${t.betrag.toFixed(2)} €</td>
+                <td class="py-2 text-xs text-zinc-400">${t.typ === 'einzahlung' ? 'Einzahlung' : 'Auszahlung'}</td>
+                <td class="py-2 text-xs text-zinc-500 italic">${t.notiz || ''}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 pt-4 border-t border-zinc-700 text-right font-semibold text-zinc-200">
+        Summe: <span class="font-mono text-xl text-white ml-2">${summe.toFixed(2)} €</span>
+      </div>
+    `;
   }
 
+  // Modal HTML
   const modalHtml = `
     <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" id="modal-overlay">
       <div class="bg-slate-900 rounded-xl p-6 w-full max-w-md shadow-lg relative text-white" id="modal-content">
-        <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick="document.getElementById('modal-overlay').remove()">✕</button>
-        <h2 class="text-lg font-bold mb-4">Kontoauszug: ${p.name}</h2>
-        <div class="max-h-[60vh] overflow-y-auto">
-          <table class="w-full text-left mb-2">
-            <thead>
-              <tr class="border-b border-zinc-700">
-                <th class="py-2 text-xs uppercase text-zinc-400">Datum</th>
-                <th class="py-2 text-xs uppercase text-zinc-400 text-right">Betrag</th>
-                <th class="py-2 text-xs uppercase text-zinc-400">Typ</th>
-                <th class="py-2 text-xs uppercase text-zinc-400">Notiz</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${buchungen.map(t => `
-                <tr class="border-b border-zinc-800/50">
-                  <td class="py-2 text-xs">${t.datum}</td>
-                  <td class="py-2 text-xs text-right font-mono">${t.betrag.toFixed(2)} €</td>
-                  <td class="py-2 text-xs text-zinc-400">${t.typ === 'einzahlung' ? 'Einzahlung' : 'Auszahlung'}</td>
-                  <td class="py-2 text-xs text-zinc-500 italic">${t.notiz || ''}</td>
-                </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-        <div class="mt-4 pt-4 border-t border-zinc-700 text-right font-semibold text-zinc-200">
-          Summe: <span class="font-mono text-xl text-white ml-2">${summe.toFixed(2)} €</span>
-        </div>
+        ${renderKontoauszugContent(minDate, maxDate)}
       </div>
     </div>
   `;
@@ -855,6 +866,22 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
       overlay.remove();
     }
   });
+
+  // Date filter logic
+  const modalContent = overlay.querySelector('#modal-content');
+  function updateFilter() {
+    const von = modalContent.querySelector('#konto-von').value;
+    const bis = modalContent.querySelector('#konto-bis').value;
+    modalContent.innerHTML = renderKontoauszugContent(von, bis);
+    // Re-attach listeners after re-render
+    attachListeners();
+  }
+  function attachListeners() {
+    modalContent.querySelector('#konto-von').addEventListener('change', updateFilter);
+    modalContent.querySelector('#konto-bis').addEventListener('change', updateFilter);
+    modalContent.querySelector('button[onclick]')?.addEventListener('click', () => overlay.remove());
+  }
+  attachListeners();
 };
 
 // Handler für Kontoauszug-Button (nur einmal, nach Funktionsdefinition)
