@@ -185,11 +185,17 @@ function renderDashboard() {
           const ziel = Number(p.ziel_betrag) || 0;
           const fortschritt = ziel > 0 ? Math.min(100, Math.round((saldo / ziel) * 100)) : 0;
           const isAllgemein = p.name === 'Allgemein';
+          const istVollErreicht = ziel > 0 && saldo >= ziel;
+          const istUeberschritten = ziel > 0 && saldo >= ziel * 1.1;
           const cardClass = isAllgemein
             ? "bg-slate-950 rounded-xl p-5 flex flex-col gap-4 shadow-md relative border-2 border-emerald-700/40"
-            : istUeberfaellig
-              ? "bg-slate-800/50 rounded-xl p-5 flex flex-col gap-4 shadow-md relative border-2 border-red-500/50 bg-red-900/10"
-              : "bg-slate-800/50 rounded-xl p-5 flex flex-col gap-4 shadow-md relative";
+            : istUeberschritten
+              ? "bg-red-900/30 rounded-xl p-5 flex flex-col gap-4 shadow-md relative border-2 border-red-400/70"
+              : istVollErreicht
+                ? "bg-emerald-900/30 rounded-xl p-5 flex flex-col gap-4 shadow-md relative border-2 border-emerald-400/70"
+                : istUeberfaellig
+                  ? "bg-slate-800/50 rounded-xl p-5 flex flex-col gap-4 shadow-md relative border-2 border-red-500/50 bg-red-900/10"
+                  : "bg-slate-800/50 rounded-xl p-5 flex flex-col gap-4 shadow-md relative";
           return isAllgemein
             ? `<div class="${cardClass}" data-posten-id="${p.id}">
                 <div class="flex items-center justify-between mb-2">
