@@ -801,9 +801,12 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
   let minDate = allBuchungen.length ? allBuchungen[allBuchungen.length-1].datum : formatLocalDate(today);
 
   // Render function for modal content
-  function renderKontoauszugContent(von, bis) {
+  function renderKontoauszugContent(von, bis, typFilter) {
     // Filtered Buchungen
-    const filtered = allBuchungen.filter(t => t.datum >= von && t.datum <= bis);
+    const filtered = allBuchungen.filter(t =>
+      t.datum >= von && t.datum <= bis &&
+      (typFilter === 'alle' || t.typ === typFilter)
+    );
     let summe = 0;
     for (const t of filtered) {
       if (t.typ === 'einzahlung') summe += Number(t.betrag);
@@ -861,6 +864,14 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
           <label class="block text-xs text-zinc-400 mb-1" for="konto-bis">Bis</label>
           <input type="date" id="konto-bis" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-zinc-100" value="${bis}" min="${minDate}" max="${maxDate}">
         </div>
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1" for="konto-typ">Typ</label>
+          <select id="konto-typ" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-zinc-100">
+            <option value="alle">Alle</option>
+            <option value="einzahlung">Einzahlung</option>
+            <option value="auszahlung">Auszahlung</option>
+          </select>
+        </div>
       </div>
       <div class="max-h-[60vh] overflow-y-auto">
         <table class="w-full text-left mb-2">
@@ -891,10 +902,11 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
   }
 
   // Modal HTML
+  let currentTyp = 'alle';
   const modalHtml = `
     <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" id="modal-overlay">
       <div class="bg-slate-900 rounded-xl p-6 w-full max-w-md shadow-lg relative text-white" id="modal-content">
-        ${renderKontoauszugContent(minDate, maxDate)}
+        ${renderKontoauszugContent(minDate, maxDate, currentTyp)}
       </div>
     </div>
   `;
@@ -910,13 +922,18 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
     }
   });
 
-  // Date filter logic
+  // Date and type filter logic
   const modalContent = overlay.querySelector('#modal-content');
   function updateFilter() {
     const von = modalContent.querySelector('#konto-von').value;
     const bis = modalContent.querySelector('#konto-bis').value;
-    modalContent.innerHTML = renderKontoauszugContent(von, bis);
+    const typ = modalContent.querySelector('#konto-typ')?.value || 'alle';
+    currentTyp = typ;
+    modalContent.innerHTML = renderKontoauszugContent(von, bis, typ);
     attachListeners();
+    // Set dropdown value after re-render
+    const typSelect = modalContent.querySelector('#konto-typ');
+    if (typSelect) typSelect.value = typ;
   }
   function attachListeners() {
     modalContent.querySelector('#konto-von').addEventListener('change', () => {
@@ -927,12 +944,19 @@ window.openKontoauszugModal = function openKontoauszugModal(postenId) {
       window.__kontoauszugPage = 1;
       updateFilter();
     });
+    modalContent.querySelector('#konto-typ')?.addEventListener('change', () => {
+      window.__kontoauszugPage = 1;
+      updateFilter();
+    });
     modalContent.querySelector('button[onclick]')?.addEventListener('click', () => overlay.remove());
     // Pagination buttons
     modalContent.querySelectorAll('button[data-page]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         let page = window.__kontoauszugPage || 1;
-        const totalPages = Math.max(1, Math.ceil(allBuchungen.filter(t => t.datum >= modalContent.querySelector('#konto-von').value && t.datum <= modalContent.querySelector('#konto-bis').value).length / 14));
+        const von = modalContent.querySelector('#konto-von').value;
+        const bis = modalContent.querySelector('#konto-bis').value;
+        const typ = modalContent.querySelector('#konto-typ')?.value || 'alle';
+        const totalPages = Math.max(1, Math.ceil(allBuchungen.filter(t => t.datum >= von && t.datum <= bis && (typ === 'alle' || t.typ === typ)).length / 14));
         if (btn.dataset.page === 'prev' && page > 1) {
           window.__kontoauszugPage = page - 1;
         } else if (btn.dataset.page === 'next' && page < totalPages) {
