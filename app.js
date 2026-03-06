@@ -230,6 +230,23 @@ function renderDashboard() {
                   <span class="font-semibold text-lg">${p.name}</span>
                   <div class="flex flex-row gap-2"> <button class="edit-posten-btn p-1 text-indigo-400 hover:text-indigo-200" title="Bearbeiten"><i data-lucide="edit-3" class="w-5 h-5"></i></button><button class="delete-posten-btn p-1 text-red-400 hover:text-red-200" title="Löschen"><i data-lucide="trash-2" class="w-5 h-5"></i></button></div>
                 </div>
+                <div class="mb-1 text-xs text-zinc-400">
+                  ${(() => {
+                    let parts = [];
+                    if (p.faelligkeitsdatum) {
+                      const d = new Date(p.faelligkeitsdatum);
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const yyyy = d.getFullYear();
+                      parts.push(`Fällig am <span class='font-semibold'>${dd}.${mm}.${yyyy}</span>`);
+                    }
+                    const monate = p.laufzeit_monate || p.laufzeit_jahre || p.faelligkeit_jahre || '';
+                    if (monate) {
+                      parts.push(`Laufzeit: <span class='font-semibold'>${monate}</span> Monate`);
+                    }
+                    return parts.length ? parts.join(' | ') : '';
+                  })()}
+                </div>
                 <div class="mb-2 flex flex-col gap-1">
                   <span class="font-mono text-3xl ${saldo < 0 ? 'text-red-400' : 'text-emerald-400'}">${saldo.toFixed(2)} €</span>
                   <span class="text-zinc-400 text-xs">Angespart von Rücklage</span>
