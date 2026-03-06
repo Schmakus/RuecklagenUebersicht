@@ -240,7 +240,7 @@ function renderDashboard() {
                       const yyyy = d.getFullYear();
                       parts.push(`Fällig am <span class='font-semibold'>${dd}.${mm}.${yyyy}</span>`);
                     }
-                    const monate = p.laufzeit_monate || p.laufzeit_jahre || p.faelligkeit_jahre || '';
+                    const monate = p.laufzeit_monate || p.faelligkeit_jahre || '';
                     if (monate) {
                       parts.push(`Laufzeit: <span class='font-semibold'>${monate}</span> Monate`);
                     }
@@ -555,7 +555,7 @@ function openAddPostenModal() {
         user_id: user.id,
         name,
         ziel_betrag,
-        laufzeit_jahre,
+        laufzeit_monate,
         faelligkeitsdatum
       }).select();
       if (postenErr || !postenRes || !postenRes[0]) throw postenErr || new Error('Fehler beim Anlegen des Postens');
@@ -623,7 +623,7 @@ function openEditPostenModal(postenId) {
             <input name="ziel_betrag" type="number" min="0" step="0.01" value="${postenObj.ziel_betrag}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           <label class="text-sm">Laufzeit (Monate):
-            <input name="laufzeit_monate" type="number" min="1" step="1" value="${postenObj.laufzeit_monate || postenObj.laufzeit_jahre || postenObj.faelligkeit_jahre || ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+            <input name="laufzeit_monate" type="number" min="1" step="1" value="${postenObj.laufzeit_monate || postenObj.faelligkeit_jahre || ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           <label class="text-sm">Fälligkeitsdatum:
             <input name="faelligkeitsdatum" type="date" value="${postenObj.faelligkeitsdatum || ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
@@ -725,7 +725,7 @@ async function loadData() {
         user_id: user.id,
         name: 'Allgemein',
         ziel_betrag: 0,
-        laufzeit_jahre: 0,
+        laufzeit_monate: 0,
         faelligkeitsdatum: new Date().toISOString().slice(0,10)
       });
     } catch (err) {

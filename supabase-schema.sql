@@ -7,7 +7,7 @@ create table posten (
   user_id uuid references auth.users not null default auth.uid(),
   name text not null,
   ziel_betrag numeric(12,2) default 0,
-  laufzeit_jahre int default 1,
+  laufzeit_monate int default 1,
   faelligkeitsdatum date,
   created_at timestamptz default now(),
   typ text not null default 'ruecklage',
