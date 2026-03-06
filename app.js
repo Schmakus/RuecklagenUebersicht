@@ -525,10 +525,10 @@ function openAddPostenModal() {
     // Feldnamen exakt wie im HTML-Formular
     const name = form.elements['name']?.value?.trim() || '';
     const ziel_betrag = Number(form.elements['ziel_betrag']?.value);
-    const laufzeit_jahre = Number(form.elements['laufzeit_jahre']?.value);
+    const laufzeit_monate = Number(form.elements['laufzeit_monate']?.value);
     const faelligkeitsdatum = form.elements['faelligkeitsdatum']?.value;
     // Nur Felder validieren, die im Editier-Modal sichtbar sind
-    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_jahre) || laufzeit_jahre < 1 || !faelligkeitsdatum) {
+    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_monate) || laufzeit_monate < 1 || !faelligkeitsdatum) {
       showToast('Bitte alle Felder korrekt ausfüllen!', 'error');
       return;
     }
@@ -637,10 +637,10 @@ function openEditPostenModal(postenId) {
     const form = e.target;
     const name = form.elements['name']?.value?.trim() || '';
     const ziel_betrag = Number(form.elements['ziel_betrag']?.value);
-    const laufzeit_jahre = Number(form.elements['laufzeit_jahre']?.value);
+    const laufzeit_monate = Number(form.elements['laufzeit_monate']?.value);
     const faelligkeitsdatum = form.elements['faelligkeitsdatum']?.value;
     // Nur Felder validieren, die im Editier-Modal sichtbar sind
-    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_jahre) || laufzeit_jahre < 1 || !faelligkeitsdatum) {
+    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_monate) || laufzeit_monate < 1 || !faelligkeitsdatum) {
       showToast('Bitte alle Felder korrekt ausfüllen!', 'error');
       return;
     }
@@ -648,7 +648,7 @@ function openEditPostenModal(postenId) {
       await supabase.from('posten').update({
         name,
         ziel_betrag,
-        laufzeit_jahre,
+        laufzeit_monate,
         faelligkeitsdatum
       }).eq('id', postenId);
       // Rate wird im Editier-Modal nicht bearbeitet
