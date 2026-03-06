@@ -9,7 +9,9 @@ create table posten (
   ziel_betrag numeric(12,2) default 0,
   laufzeit_jahre int default 1,
   faelligkeitsdatum date,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  typ text not null default 'ruecklage',
+  kredit_betrag numeric(12,2)
 );
 
 create table raten (
