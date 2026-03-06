@@ -236,6 +236,13 @@ function renderDashboard() {
                 </div>
                 <div class="flex items-center gap-2 mb-2">
                   <span class="text-emerald-200 font-mono text-lg">Ziel: ${ziel.toFixed(2)} €</span>
+                  <!-- Aktuelle Rate anzeigen -->
+                  ${(() => {
+                    const ratenList = raten.filter(r => r.posten_id === p.id);
+                    if (ratenList.length === 0) return '';
+                    const aktuelleRate = ratenList.sort((a, b) => new Date(b.start_datum) - new Date(a.start_datum))[0];
+                    return `<span class='text-indigo-400 font-mono text-sm ml-2'>Rate: ${Number(aktuelleRate.betrag).toFixed(2)} €<br><span class='text-xs text-zinc-400'>ab ${aktuelleRate.start_datum}</span></span>`;
+                  })()}
                 </div>
                 <div class="mb-4">
                   <div class="flex justify-between text-xs mb-1">
@@ -514,9 +521,8 @@ function openAddPostenModal() {
     const ziel_betrag = Number(form.elements['ziel_betrag']?.value);
     const laufzeit_jahre = Number(form.elements['laufzeit_jahre']?.value);
     const faelligkeitsdatum = form.elements['faelligkeitsdatum']?.value;
-    const rate_betrag = Number(form.elements['rate_betrag']?.value);
-    const rate_start_datum = form.elements['rate_start_datum']?.value;
-    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_jahre) || laufzeit_jahre < 1 || !faelligkeitsdatum || isNaN(rate_betrag) || rate_betrag <= 0 || !rate_start_datum) {
+    // Nur Felder validieren, die im Editier-Modal sichtbar sind
+    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_jahre) || laufzeit_jahre < 1 || !faelligkeitsdatum) {
       showToast('Bitte alle Felder korrekt ausfüllen!', 'error');
       return;
     }
@@ -627,9 +633,8 @@ function openEditPostenModal(postenId) {
     const ziel_betrag = Number(form.elements['ziel_betrag']?.value);
     const laufzeit_jahre = Number(form.elements['laufzeit_jahre']?.value);
     const faelligkeitsdatum = form.elements['faelligkeitsdatum']?.value;
-    const rate_betrag = Number(form.elements['rate_betrag']?.value);
-    const rate_start_datum = form.elements['rate_start_datum']?.value;
-    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_jahre) || laufzeit_jahre < 1 || !faelligkeitsdatum || isNaN(rate_betrag) || rate_betrag <= 0 || !rate_start_datum) {
+    // Nur Felder validieren, die im Editier-Modal sichtbar sind
+    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_jahre) || laufzeit_jahre < 1 || !faelligkeitsdatum) {
       showToast('Bitte alle Felder korrekt ausfüllen!', 'error');
       return;
     }
@@ -640,13 +645,7 @@ function openEditPostenModal(postenId) {
         laufzeit_jahre,
         faelligkeitsdatum
       }).eq('id', postenId);
-      // Update aktuelle Rate
-      if (aktuelleRate) {
-        await supabase.from('raten').update({
-          betrag: rate_betrag,
-          start_datum: rate_start_datum
-        }).eq('id', aktuelleRate.id);
-      }
+      // Rate wird im Editier-Modal nicht bearbeitet
       showToast('Rücklage gespeichert.', 'success');
       document.getElementById('modal-overlay').remove();
       // Erstes Laden (triggert automatische Buchung)
