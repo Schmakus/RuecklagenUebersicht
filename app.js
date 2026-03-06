@@ -198,7 +198,11 @@ function renderDashboard() {
           const heute = new Date().toISOString().slice(0,10);
           const istUeberfaellig = p.faelligkeitsdatum && heute > p.faelligkeitsdatum && saldo > 0;
           const ziel = Number(p.ziel_betrag) || 0;
-          const fortschritt = ziel > 0 ? Math.min(100, Math.round((saldo / ziel) * 100)) : 0;
+          // Fortschritt: Saldo/Zielbetrag, aber bei negativem Saldo immer 0
+          let fortschritt = 0;
+          if (ziel > 0 && saldo >= 0) {
+            fortschritt = Math.min(100, Math.round((saldo / ziel) * 100));
+          }
           const isAllgemein = p.name === 'Allgemein';
           const istVollErreicht = ziel > 0 && saldo >= ziel;
           const istUeberschritten = ziel > 0 && saldo >= ziel * 1.1;
@@ -230,7 +234,7 @@ function renderDashboard() {
                   <span class="font-semibold text-lg">${p.name}</span>
                   <div class="flex flex-row gap-2"> <button class="edit-posten-btn p-1 text-indigo-400 hover:text-indigo-200" title="Bearbeiten"><i data-lucide="edit-3" class="w-5 h-5"></i></button><button class="delete-posten-btn p-1 text-red-400 hover:text-red-200" title="Löschen"><i data-lucide="trash-2" class="w-5 h-5"></i></button></div>
                 </div>
-                <div class="mb-1 text-xs text-zinc-400">
+                <div class="mb-4 text-xs text-zinc-400">
                   ${(() => {
                     let parts = [];
                     if (p.faelligkeitsdatum) {
@@ -247,7 +251,7 @@ function renderDashboard() {
                     return parts.length ? parts.join(' | ') : '';
                   })()}
                 </div>
-                <div class="mb-2 flex flex-col gap-1">
+                <div class="mb-6 flex flex-col gap-1">
                   <span class="font-mono text-3xl ${saldo < 0 ? 'text-red-400' : 'text-emerald-400'}">${saldo.toFixed(2)} €</span>
                   <span class="text-zinc-400 text-xs">Angespart von Rücklage</span>
                 </div>
@@ -560,6 +564,9 @@ function openAddPostenModal() {
       }).select();
       if (postenErr || !postenRes || !postenRes[0]) throw postenErr || new Error('Fehler beim Anlegen des Postens');
       const postenId = postenRes[0].id;
+      // Rate-Felder aus dem Formular extrahieren
+      const rate_betrag = Number(form.elements['rate_betrag']?.value);
+      const rate_start_datum = form.elements['rate_start_datum']?.value;
       // Prüfe, ob Rate für dieses Datum schon existiert
       const { data: existingRates } = await supabase.from('raten')
         .select('*')
