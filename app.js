@@ -198,9 +198,15 @@ function renderDashboard() {
           const heute = new Date().toISOString().slice(0,10);
           const istUeberfaellig = p.faelligkeitsdatum && heute > p.faelligkeitsdatum && saldo > 0;
           const ziel = Number(p.ziel_betrag) || 0;
-          // Fortschritt: Saldo/Zielbetrag, aber bei negativem Saldo immer 0
+          const isKredit = p.typ === 'kredit';
+          const kredit_betrag = Number(p.kredit_betrag) || 0;
+          // Fortschritt: Kredit = Rückzahlungsfortschritt, Rücklage = Saldo/Ziel
           let fortschritt = 0;
-          if (ziel > 0 && saldo >= 0) {
+          if (isKredit) {
+            if (kredit_betrag > 0) {
+              fortschritt = Math.min(100, Math.max(0, Math.round(((saldo + kredit_betrag) / kredit_betrag) * 100)));
+            }
+          } else if (ziel > 0 && saldo >= 0) {
             fortschritt = Math.min(100, Math.round((saldo / ziel) * 100));
           }
           const isAllgemein = p.name === 'Allgemein';
@@ -208,13 +214,17 @@ function renderDashboard() {
           const istUeberschritten = ziel > 0 && saldo >= ziel * 1.1;
           const cardClass = isAllgemein
             ? "bg-slate-950 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative border-2 border-emerald-700/40"
-            : istUeberschritten
-              ? "bg-red-900/30 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative border-2 border-red-400/70"
-              : istVollErreicht
-                ? "bg-emerald-900/30 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative border-2 border-emerald-400/70"
-                : istUeberfaellig
-                  ? "bg-slate-800/50 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative border-2 border-red-500/50 bg-red-900/10"
-                  : "bg-slate-800/50 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative";
+            : isKredit && saldo >= 0
+              ? "bg-emerald-900/20 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative border-2 border-emerald-500/50"
+              : isKredit
+                ? "bg-orange-900/10 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative border-2 border-orange-500/50"
+                : istUeberschritten
+                  ? "bg-red-900/30 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative border-2 border-red-400/70"
+                  : istVollErreicht
+                    ? "bg-emerald-900/30 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative border-2 border-emerald-400/70"
+                    : istUeberfaellig
+                      ? "bg-slate-800/50 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative border-2 border-red-500/50 bg-red-900/10"
+                      : "bg-slate-800/50 rounded-xl p-5 flex flex-col justify-between h-full shadow-md relative";
           // Neue Darstellung: Angespart groß, Ziel darunter
           return isAllgemein
             ? `<div class="${cardClass}" data-posten-id="${p.id}">
@@ -231,7 +241,10 @@ function renderDashboard() {
               </div>`
             : `<div class="${cardClass}" data-posten-id="${p.id}">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="font-semibold text-lg">${p.name}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-lg">${p.name}</span>
+                    ${isKredit ? '<span class="text-xs font-semibold bg-orange-700/60 text-orange-200 rounded px-1.5 py-0.5">Kredit</span>' : ''}
+                  </div>
                   <div class="flex flex-row gap-2"> <button class="edit-posten-btn p-1 text-indigo-400 hover:text-indigo-200" title="Bearbeiten"><i data-lucide="edit-3" class="w-5 h-5"></i></button><button class="delete-posten-btn p-1 text-red-400 hover:text-red-200" title="Löschen"><i data-lucide="trash-2" class="w-5 h-5"></i></button></div>
                 </div>
                 <div class="mb-4 text-xs text-zinc-400">
@@ -253,11 +266,11 @@ function renderDashboard() {
                 </div>
                 <div class="mb-6 flex flex-col gap-1">
                   <span class="font-mono text-3xl ${saldo < 0 ? 'text-red-400' : 'text-emerald-400'}">${saldo.toFixed(2)} €</span>
-                  <span class="text-zinc-400 text-xs">Angespart von Rücklage</span>
+                  <span class="text-zinc-400 text-xs">${isKredit ? 'Verbleibende Schulden' : 'Angespart von Rücklage'}</span>
                 </div>
                 <div class="flex flex-col mb-2">
                   <div class="flex flex-row items-center gap-4 justify-center">
-                    <span class="text-emerald-200 font-mono text-lg">Ziel: ${ziel.toFixed(2)} €</span>
+                    <span class="text-emerald-200 font-mono text-base">${isKredit ? 'Kredit: ' + kredit_betrag.toFixed(2) + ' €' : 'Ziel: ' + ziel.toFixed(2) + ' €'}</span>
                     ${(() => {
                       const ratenList = raten.filter(r => r.posten_id === p.id);
                       if (ratenList.length === 0) return '';
@@ -277,7 +290,7 @@ function renderDashboard() {
                     <span class="text-zinc-400">${fortschritt}%</span>
                   </div>
                   <div class="w-full h-3 bg-slate-700 rounded-full overflow-hidden">
-                    <div class="h-3 bg-emerald-600 rounded-full transition-all duration-300" style="width: ${fortschritt}%;"></div>
+                    <div class="h-3 ${isKredit ? 'bg-orange-500' : 'bg-emerald-600'} rounded-full transition-all duration-300" style="width: ${fortschritt}%;"></div>
                   </div>
                 </div>
                 <div class="flex gap-2 mt-auto">
@@ -473,45 +486,66 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// --- Modal für neue Rücklage (mit Fälligkeitsdatum & Rate) ---
+// --- Modal für neue Rücklage oder Kredit ---
 function openAddPostenModal() {
+  const heute = new Date().toISOString().slice(0,10);
+  let currentTyp = 'ruecklage';
   const modalHtml = `
     <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div class="bg-slate-900 rounded-xl p-6 w-full max-w-sm shadow-lg relative">
         <button class="absolute top-2 right-2 text-zinc-400 hover:text-zinc-200" onclick="document.getElementById('modal-overlay').remove()">✕</button>
-        <h2 class="text-lg font-bold mb-4">Neue Rücklage anlegen</h2>
+        <h2 class="text-lg font-bold mb-4" id="add-modal-title">Neue Rücklage anlegen</h2>
+        <div class="flex mb-4 rounded-lg overflow-hidden border border-slate-700">
+          <button id="toggle-ruecklage" type="button" onclick="setAddPostenTyp('ruecklage')" class="flex-1 py-2 text-sm font-semibold bg-emerald-600 text-white">Rücklage</button>
+          <button id="toggle-kredit" type="button" onclick="setAddPostenTyp('kredit')" class="flex-1 py-2 text-sm font-semibold bg-slate-700 text-zinc-300">Kredit</button>
+        </div>
         <form id="add-posten-form" class="flex flex-col gap-3">
           <label class="text-sm">Name:
             <input name="name" type="text" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
-          <label class="text-sm">Zielbetrag (€):
-            <input name="ziel_betrag" type="number" min="0" step="0.01" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
-          </label>
+          <div id="field-ziel-betrag">
+            <label class="text-sm">Zielbetrag (€):
+              <input name="ziel_betrag" type="number" min="0" step="0.01" class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+            </label>
+          </div>
+          <div id="field-kredit-betrag" class="hidden">
+            <label class="text-sm">Kreditbetrag (€):
+              <input name="kredit_betrag" type="number" min="0.01" step="0.01" class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+            </label>
+          </div>
           <label class="text-sm">Laufzeit (Monate):
             <input name="laufzeit_monate" type="number" min="1" step="1" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
           <label class="text-sm">Fälligkeitsdatum:
             <input name="faelligkeitsdatum" type="date" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
-          <label class="text-sm">Monatliche Rate (€, Vorschlag):
-            <input name="rate_betrag" type="number" min="0" step="0.01" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
-          </label>
-          <label class="text-sm">Startdatum der Rate:
-            <input name="rate_start_datum" type="date" value="${new Date().toISOString().slice(0,10)}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
-          </label>
-          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded px-4 py-2 mt-2">Anlegen</button>
+          <div id="keine-rate-toggle-row" class="hidden items-center justify-between py-1">
+            <span class="text-sm text-zinc-300">Keine monatliche Rate</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="keine-rate-cb" class="sr-only peer" onchange="toggleAddKeineRate(this)">
+              <div class="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-orange-500 transition-all"></div>
+              <div class="absolute top-0.5 left-0.5 h-4 w-4 bg-white rounded-full shadow transition-all peer-checked:translate-x-4"></div>
+            </label>
+          </div>
+          <div id="rate-inputs" class="flex flex-col gap-3">
+            <label class="text-sm">Monatliche Rate (€, Vorschlag):
+              <input name="rate_betrag" type="number" min="0" step="0.01" class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+            </label>
+            <label class="text-sm">Startdatum der Rate:
+              <input name="rate_start_datum" type="date" value="${heute}" class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+            </label>
+          </div>
+          <button type="submit" id="add-submit-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded px-4 py-2 mt-2">Anlegen</button>
         </form>
       </div>
     </div>
   `;
-  // Vorheriges Modal entfernen, falls vorhanden
   const oldModal = document.getElementById('modal-overlay');
   if (oldModal) oldModal.remove();
-  let modalDiv = document.createElement('div');
+  const modalDiv = document.createElement('div');
   modalDiv.id = 'modal-overlay';
   modalDiv.innerHTML = modalHtml;
   document.body.appendChild(modalDiv);
-  // Klick außerhalb des Modal-Inhalts schließt das Modal
   modalDiv.addEventListener('click', (e) => {
     if (
       e.target === modalDiv ||
@@ -520,74 +554,126 @@ function openAddPostenModal() {
       modalDiv.remove();
     }
   });
-  // Vorschlagslogik für Rate direkt nach dem Einfügen
+
+  window.setAddPostenTyp = function(typ) {
+    currentTyp = typ;
+    const isKredit = typ === 'kredit';
+    document.getElementById('add-modal-title').textContent = isKredit ? 'Neuen Kredit anlegen' : 'Neue Rücklage anlegen';
+    document.getElementById('toggle-ruecklage').className = isKredit
+      ? 'flex-1 py-2 text-sm font-semibold bg-slate-700 text-zinc-300'
+      : 'flex-1 py-2 text-sm font-semibold bg-emerald-600 text-white';
+    document.getElementById('toggle-kredit').className = isKredit
+      ? 'flex-1 py-2 text-sm font-semibold bg-orange-600 text-white'
+      : 'flex-1 py-2 text-sm font-semibold bg-slate-700 text-zinc-300';
+    document.getElementById('field-ziel-betrag').classList.toggle('hidden', isKredit);
+    document.getElementById('field-kredit-betrag').classList.toggle('hidden', !isKredit);
+    const keineRateRow = document.getElementById('keine-rate-toggle-row');
+    if (isKredit) {
+      keineRateRow.classList.remove('hidden');
+      keineRateRow.classList.add('flex');
+    } else {
+      keineRateRow.classList.add('hidden');
+      keineRateRow.classList.remove('flex');
+    }
+    document.getElementById('add-submit-btn').className = isKredit
+      ? 'bg-orange-600 hover:bg-orange-700 text-white rounded px-4 py-2 mt-2'
+      : 'bg-emerald-600 hover:bg-emerald-700 text-white rounded px-4 py-2 mt-2';
+    // Reset keine-rate on typ switch
+    const cb = document.getElementById('keine-rate-cb');
+    if (cb) { cb.checked = false; }
+    document.getElementById('rate-inputs').classList.remove('hidden');
+    updateRate();
+  };
+
+  window.toggleAddKeineRate = function(cb) {
+    document.getElementById('rate-inputs').classList.toggle('hidden', cb.checked);
+  };
+
   const zielInput = modalDiv.querySelector('input[name="ziel_betrag"]');
+  const kreditInput = modalDiv.querySelector('input[name="kredit_betrag"]');
   const laufzeitInput = modalDiv.querySelector('input[name="laufzeit_monate"]');
   const rateInput = modalDiv.querySelector('input[name="rate_betrag"]');
+
   function updateRate() {
-    const ziel = Number(zielInput.value);
+    const isKredit = currentTyp === 'kredit';
+    const referenceInput = isKredit ? kreditInput : zielInput;
+    const ziel = Number(referenceInput.value);
     const monate = Number(laufzeitInput.value);
     if (
-      zielInput.value !== '' && laufzeitInput.value !== '' &&
+      referenceInput.value !== '' && laufzeitInput.value !== '' &&
       !isNaN(ziel) && ziel > 0 && !isNaN(monate) && monate > 0
     ) {
-      const vorschlag = monate > 0 ? ziel / monate : 0;
-      rateInput.value = vorschlag.toFixed(2);
+      rateInput.value = (ziel / monate).toFixed(2);
     } else {
       rateInput.value = '';
     }
   }
   zielInput.addEventListener('input', updateRate);
+  kreditInput.addEventListener('input', updateRate);
   laufzeitInput.addEventListener('input', updateRate);
-  rateInput.value = '';
+
   document.getElementById('add-posten-form').onsubmit = async (e) => {
     e.preventDefault();
     const form = e.target;
-    // Feldnamen exakt wie im HTML-Formular
     const name = form.elements['name']?.value?.trim() || '';
-    const ziel_betrag = Number(form.elements['ziel_betrag']?.value);
     const laufzeit_monate = Number(form.elements['laufzeit_monate']?.value);
     const faelligkeitsdatum = form.elements['faelligkeitsdatum']?.value;
-    // Nur Felder validieren, die im Editier-Modal sichtbar sind
-    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_monate) || laufzeit_monate < 1 || !faelligkeitsdatum) {
-      showToast('Bitte alle Felder korrekt ausfüllen!', 'error');
+    const isKredit = currentTyp === 'kredit';
+    if (!name || isNaN(laufzeit_monate) || laufzeit_monate < 1 || !faelligkeitsdatum) {
+      showToast('Bitte alle Pflichtfelder ausfüllen!', 'error');
       return;
     }
+    let ziel_betrag = 0;
+    let kredit_betrag = 0;
+    if (isKredit) {
+      kredit_betrag = Number(form.elements['kredit_betrag']?.value);
+      if (isNaN(kredit_betrag) || kredit_betrag <= 0) {
+        showToast('Bitte einen gültigen Kreditbetrag eingeben!', 'error');
+        return;
+      }
+    } else {
+      ziel_betrag = Number(form.elements['ziel_betrag']?.value);
+      if (isNaN(ziel_betrag) || ziel_betrag < 0) {
+        showToast('Bitte einen gültigen Zielbetrag eingeben!', 'error');
+        return;
+      }
+    }
     try {
-      // 1. Posten anlegen
       const { data: postenRes, error: postenErr } = await supabase.from('posten').insert({
         user_id: user.id,
         name,
-        ziel_betrag,
+        ziel_betrag: isKredit ? kredit_betrag : ziel_betrag,
         laufzeit_monate,
-        faelligkeitsdatum
+        faelligkeitsdatum,
+        typ: isKredit ? 'kredit' : 'ruecklage',
+        kredit_betrag: isKredit ? kredit_betrag : null
       }).select();
       if (postenErr || !postenRes || !postenRes[0]) throw postenErr || new Error('Fehler beim Anlegen des Postens');
       const postenId = postenRes[0].id;
-      // Rate-Felder aus dem Formular extrahieren
-      const rate_betrag = Number(form.elements['rate_betrag']?.value);
-      const rate_start_datum = form.elements['rate_start_datum']?.value;
-      // Prüfe, ob Rate für dieses Datum schon existiert
-      const { data: existingRates } = await supabase.from('raten')
-        .select('*')
-        .eq('posten_id', postenId)
-        .eq('start_datum', rate_start_datum);
-      let ratenErr = null;
-      if (existingRates && existingRates.length > 0) {
-        // Überschreibe vorhandene Rate
-        const { error } = await supabase.from('raten').update({ betrag: rate_betrag }).eq('id', existingRates[0].id);
-        ratenErr = error;
-      } else {
-        // Neue Rate anlegen
-        const { error } = await supabase.from('raten').insert({
+      // Bei Kredit: Initiale Auszahlung (Kreditbetrag) anlegen
+      if (isKredit) {
+        await supabase.from('transaktionen').insert({
           posten_id: postenId,
-          betrag: rate_betrag,
-          start_datum: rate_start_datum
+          betrag: kredit_betrag,
+          typ: 'auszahlung',
+          datum: heute,
+          notiz: 'Kreditaufnahme'
         });
-        ratenErr = error;
       }
-      if (ratenErr) throw ratenErr;
-      showToast('Rücklage angelegt.', 'success');
+      // Rate anlegen, wenn nicht deaktiviert
+      const keineRate = document.getElementById('keine-rate-cb')?.checked || false;
+      if (!keineRate) {
+        const rate_betrag = Number(form.elements['rate_betrag']?.value);
+        const rate_start_datum = form.elements['rate_start_datum']?.value;
+        if (!isNaN(rate_betrag) && rate_betrag > 0 && rate_start_datum) {
+          await supabase.from('raten').insert({
+            posten_id: postenId,
+            betrag: rate_betrag,
+            start_datum: rate_start_datum
+          });
+        }
+      }
+      showToast(isKredit ? 'Kredit angelegt.' : 'Rücklage angelegt.', 'success');
       document.getElementById('modal-overlay').remove();
       await loadData();
       renderDashboard();
@@ -596,13 +682,6 @@ function openAddPostenModal() {
     }
   };
 }
-
-// --- Button-Handler für neue Rücklage ---
-document.addEventListener('click', (e) => {
-  if (e.target && e.target.id === 'add-posten-btn') {
-    openAddPostenModal();
-  }
-});
 
 // --- Modal für Rücklage bearbeiten (mit Fälligkeitsdatum & Rate) ---
 function openEditPostenModal(postenId) {
