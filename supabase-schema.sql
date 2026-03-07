@@ -8,11 +8,13 @@ create table posten (
   name text not null,
   ziel_betrag numeric(12,2) default 0,
   laufzeit_monate int default 1,
-  faelligkeitsdatum date,
+  faelligkeit_tag smallint,
+  faelligkeit_monat smallint,
   created_at timestamptz default now(),
   typ text not null default 'ruecklage',
   kredit_betrag numeric(12,2),
-  konto text not null default 'Rücklagen'
+  konto text not null default 'Rücklagen',
+  archiviert boolean not null default false
 );
 
 create table raten (

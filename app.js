@@ -198,8 +198,26 @@ function renderDashboard() {
     if (p.name === 'Allgemein') return true;
     return window.kontoFilter.includes(p.konto || 'Rücklagen');
   });
-  // Gesamtsumme aller Ansparungen inkl. "Allgemein"
-  const totalSaldo = posten.reduce((sum, p) => sum + (window.berechnePostenSaldo ? window.berechnePostenSaldo(p.id) : 0), 0);
+  // Archiv-Filter
+  if (!window.archivFilter) window.archivFilter = 'aktiv';
+  const archivFilteredPosten = kontoFilteredPosten.filter(p => {
+    if (p.name === 'Allgemein') return true;
+    if (window.archivFilter === 'aktiv') return !p.archiviert;
+    if (window.archivFilter === 'archiviert') return !!p.archiviert;
+    return true; // 'alle'
+  });
+  // Gesamtsumme aller Ansparungen (nur aktive Posten)
+  const activePosten = posten.filter(p => !p.archiviert);
+  const totalSaldo = activePosten.reduce((sum, p) => sum + (window.berechnePostenSaldo ? window.berechnePostenSaldo(p.id) : 0), 0);
+  // Monatliche Gesamtbelastung (Summe aller aktuellen Raten aktiver Posten)
+  const monatlicheBelastung = activePosten
+    .filter(p => p.name !== 'Allgemein')
+    .reduce((sum, p) => {
+      const postenRaten = raten.filter(r => r.posten_id === p.id);
+      if (postenRaten.length === 0) return sum;
+      const aktRate = postenRaten.sort((a, b) => new Date(b.start_datum) - new Date(a.start_datum))[0];
+      return sum + Number(aktRate.betrag);
+    }, 0);
   app.innerHTML = `
     <div class="max-w-[88rem] mx-auto w-full mt-4 px-2 flex flex-col items-center">
       <h1 class="text-2xl font-bold mb-6 text-center">Rücklagen Dashboard</h1>
@@ -207,6 +225,10 @@ function renderDashboard() {
         <div class="flex items-center gap-2 text-lg font-semibold text-emerald-300 bg-slate-800/70 rounded-xl px-4 py-2">
           <svg xmlns='http://www.w3.org/2000/svg' class='w-6 h-6 text-emerald-400' fill='none' viewBox='0 0 24 24' stroke='currentColor' stroke-width='2'><circle cx='12' cy='12' r='10' /><path d='M8 12h8M12 8v8' /></svg>
           Angespart: <span class="font-mono text-emerald-200 text-xl">${totalSaldo.toFixed(2)} €</span>
+        </div>
+        <div class="flex items-center gap-2 text-lg font-semibold text-indigo-300 bg-slate-800/70 rounded-xl px-4 py-2">
+          <svg xmlns='http://www.w3.org/2000/svg' class='w-6 h-6 text-indigo-400' fill='none' viewBox='0 0 24 24' stroke='currentColor' stroke-width='2'><path d='M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6'/></svg>
+          Monatlich: <span class="font-mono text-indigo-200 text-xl">${monatlicheBelastung.toFixed(2)} €</span>
         </div>
         <button id="add-posten-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded px-4 py-2 flex items-center gap-2">
           <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='w-5 h-5'><line x1='12' y1='5' x2='12' y2='19'/><line x1='5' y1='12' x2='19' y2='12'/></svg>
@@ -239,12 +261,30 @@ function renderDashboard() {
             }).join('')}
           </div>
         </div>
+        <div class="flex-shrink-0">
+          <span class="block text-xs text-zinc-400 mb-1">Status</span>
+          <div class="flex gap-2">
+            ${['aktiv', 'archiviert', 'alle'].map(s => {
+              const isActive = window.archivFilter === s;
+              const label = s.charAt(0).toUpperCase() + s.slice(1);
+              return `<button type="button" class="archiv-filter-btn px-3 py-1.5 rounded text-xs font-semibold border transition-all ${
+                isActive ? 'bg-amber-600 border-amber-500 text-white' : 'bg-slate-800 border-zinc-700 text-zinc-400'
+              }" data-status="${s}">${label}</button>`;
+            }).join('')}
+          </div>
+        </div>
       </div>
       <div id="posten-grid" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 justify-center">
-        ${kontoFilteredPosten.length === 0 ? `<div class="col-span-2 text-center text-zinc-500">Keine passenden Posten gefunden.</div>` : kontoFilteredPosten.map(p => {
+        ${archivFilteredPosten.length === 0 ? `<div class="col-span-2 text-center text-zinc-500">Keine passenden Posten gefunden.</div>` : archivFilteredPosten.map(p => {
           const saldo = window.berechnePostenSaldo ? window.berechnePostenSaldo(p.id) : 0;
-          const heute = new Date().toISOString().slice(0,10);
-          const istUeberfaellig = p.faelligkeitsdatum && heute > p.faelligkeitsdatum && saldo > 0;
+          const istUeberfaellig = (() => {
+            if (!p.faelligkeit_tag || !p.faelligkeit_monat || saldo <= 0) return false;
+            const now = new Date();
+            const maxTag = new Date(now.getFullYear(), p.faelligkeit_monat, 0).getDate();
+            const tag = Math.min(p.faelligkeit_tag, maxTag);
+            const deadline = new Date(now.getFullYear(), p.faelligkeit_monat - 1, tag);
+            return now > deadline;
+          })();
           const ziel = Number(p.ziel_betrag) || 0;
           const isKredit = p.typ === 'kredit';
           const kredit_betrag = Number(p.kredit_betrag) || 0;
@@ -293,21 +333,22 @@ function renderDashboard() {
                     <span class="font-semibold text-lg">${p.name}</span>
                     ${isKredit ? '<span class="text-xs font-semibold bg-orange-700/60 text-orange-200 rounded px-1.5 py-0.5">Kredit</span>' : ''}
                   </div>
-                  <div class="flex flex-row gap-2"> <button class="edit-posten-btn p-1 text-indigo-400 hover:text-indigo-200" title="Bearbeiten"><i data-lucide="edit-3" class="w-5 h-5"></i></button><button class="delete-posten-btn p-1 text-red-400 hover:text-red-200" title="Löschen"><i data-lucide="trash-2" class="w-5 h-5"></i></button></div>
+                  <div class="flex flex-row gap-2"> <button class="edit-posten-btn p-1 text-indigo-400 hover:text-indigo-200" title="Bearbeiten"><i data-lucide="edit-3" class="w-5 h-5"></i></button><button class="archive-posten-btn p-1 ${p.archiviert ? 'text-emerald-400 hover:text-emerald-200' : 'text-amber-400 hover:text-amber-200'}" title="${p.archiviert ? 'Wiederherstellen' : 'Archivieren'}"><i data-lucide="${p.archiviert ? 'archive-restore' : 'archive'}" class="w-5 h-5"></i></button><button class="delete-posten-btn p-1 text-red-400 hover:text-red-200" title="Löschen"><i data-lucide="trash-2" class="w-5 h-5"></i></button></div>
                 </div>
                 <div class="mb-4 text-xs text-zinc-400">
                   ${(() => {
+                    const MONAT_NAMEN = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
                     let parts = [];
-                    if (p.faelligkeitsdatum) {
-                      const d = new Date(p.faelligkeitsdatum);
-                      const dd = String(d.getDate()).padStart(2, '0');
-                      const mm = String(d.getMonth() + 1).padStart(2, '0');
-                      const yyyy = d.getFullYear();
-                      parts.push(`Fällig am <span class='font-semibold'>${dd}.${mm}.${yyyy}</span>`);
+                    if (p.faelligkeit_tag && p.faelligkeit_monat) {
+                      const dd = String(p.faelligkeit_tag).padStart(2, '0');
+                      const monName = MONAT_NAMEN[p.faelligkeit_monat - 1] || '';
+                      parts.push(`Fällig am <span class='font-semibold'>${dd}. ${monName}</span>`);
                     }
-                    const monate = p.laufzeit_monate || p.faelligkeit_jahre || '';
-                    if (monate) {
-                      parts.push(`Laufzeit: <span class='font-semibold'>${monate}</span> Monate`);
+                    if (p.laufzeit_monate) {
+                      parts.push(`Laufzeit: <span class='font-semibold'>${p.laufzeit_monate}</span> Mon.`);
+                    }
+                    if (p.archiviert) {
+                      parts.push(`<span class='text-amber-400 font-semibold'>Archiviert</span>`);
                     }
                     return parts.length ? parts.join(' | ') : '';
                   })()}
@@ -333,7 +374,7 @@ function renderDashboard() {
                     return `<div class='flex flex-col items-end pr-6'><span class='text-xs text-zinc-400 mt-0.5'>ab ${aktuelleRate.start_datum}</span></div>`;
                   })()}
                 </div>
-                <div class="mb-4">
+                <div class="mb-2">
                   <div class="flex justify-between text-xs mb-1">
                     <span class="text-zinc-400">${fortschritt}%</span>
                   </div>
@@ -341,6 +382,25 @@ function renderDashboard() {
                     <div class="h-3 ${isKredit ? 'bg-orange-500' : 'bg-emerald-600'} rounded-full transition-all duration-300" style="width: ${fortschritt}%;"></div>
                   </div>
                 </div>
+                ${(() => {
+                  const rList = raten.filter(r => r.posten_id === p.id);
+                  if (rList.length === 0) return '';
+                  const aRate = rList.sort((a, b) => new Date(b.start_datum) - new Date(a.start_datum))[0];
+                  const rate = Number(aRate.betrag);
+                  if (rate <= 0) return '';
+                  if (isKredit) {
+                    if (saldo >= 0) return `<div class='text-xs text-emerald-400 text-center mb-2 font-semibold'>Abbezahlt ✓</div>`;
+                    const rem = Math.abs(saldo);
+                    const mon = Math.ceil(rem / rate);
+                    return `<div class='text-xs text-zinc-400 text-center mb-2'>Abbezahlt in ~${mon} Mon.</div>`;
+                  } else {
+                    if (ziel <= 0) return '';
+                    if (saldo >= ziel) return `<div class='text-xs text-emerald-400 text-center mb-2 font-semibold'>Ziel erreicht ✓</div>`;
+                    const rem = ziel - saldo;
+                    const mon = Math.ceil(rem / rate);
+                    return `<div class='text-xs text-zinc-400 text-center mb-2'>Ziel in ~${mon} Mon.</div>`;
+                  }
+                })()}
                 <div class="flex gap-2 mt-auto">
                   <button class="show-kontoauszug-btn border border-emerald-600 text-emerald-400 rounded px-3 py-1 text-xs flex-1">Kontoauszug</button>
                   <button class="trans-btn border border-slate-500 text-slate-300 rounded px-3 py-1 text-xs flex-1">Transaktion</button>
@@ -376,6 +436,12 @@ function renderDashboard() {
       } else {
         window.kontoFilter = [...window.kontoFilter, konto];
       }
+      renderDashboard();
+    });
+  });
+  document.querySelectorAll('.archiv-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      window.archivFilter = btn.dataset.status;
       renderDashboard();
     });
   });
@@ -599,9 +665,18 @@ function openAddPostenModal() {
           <label class="text-sm">Laufzeit (Monate):
             <input name="laufzeit_monate" type="number" min="1" step="1" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
-          <label class="text-sm">Fälligkeitsdatum:
-            <input name="faelligkeitsdatum" type="date" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
-          </label>
+          <div class="text-sm">Fälligkeit (Tag & Monat):
+            <div class="flex gap-2 mt-1">
+              <input name="faelligkeit_tag" type="number" min="1" max="31" placeholder="Tag" required class="w-20 rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+              <select name="faelligkeit_monat" required class="flex-1 rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100">
+                <option value="">Monat...</option>
+                <option value="1">Januar</option><option value="2">Februar</option><option value="3">März</option>
+                <option value="4">April</option><option value="5">Mai</option><option value="6">Juni</option>
+                <option value="7">Juli</option><option value="8">August</option><option value="9">September</option>
+                <option value="10">Oktober</option><option value="11">November</option><option value="12">Dezember</option>
+              </select>
+            </div>
+          </div>
           <div id="keine-rate-toggle-row" class="hidden items-center justify-between py-1">
             <span class="text-sm text-zinc-300">Keine monatliche Rate</span>
             <label class="relative inline-flex items-center cursor-pointer">
@@ -700,9 +775,10 @@ function openAddPostenModal() {
     const form = e.target;
     const name = form.elements['name']?.value?.trim() || '';
     const laufzeit_monate = Number(form.elements['laufzeit_monate']?.value);
-    const faelligkeitsdatum = form.elements['faelligkeitsdatum']?.value;
+    const faelligkeit_tag = Number(form.elements['faelligkeit_tag']?.value);
+    const faelligkeit_monat = Number(form.elements['faelligkeit_monat']?.value);
     const isKredit = currentTyp === 'kredit';
-    if (!name || isNaN(laufzeit_monate) || laufzeit_monate < 1 || !faelligkeitsdatum) {
+    if (!name || isNaN(laufzeit_monate) || laufzeit_monate < 1 || isNaN(faelligkeit_tag) || faelligkeit_tag < 1 || faelligkeit_tag > 31 || isNaN(faelligkeit_monat) || faelligkeit_monat < 1 || faelligkeit_monat > 12) {
       showToast('Bitte alle Pflichtfelder ausfüllen!', 'error');
       return;
     }
@@ -727,7 +803,8 @@ function openAddPostenModal() {
         name,
         ziel_betrag: isKredit ? kredit_betrag : ziel_betrag,
         laufzeit_monate,
-        faelligkeitsdatum,
+        faelligkeit_tag,
+        faelligkeit_monat,
         typ: isKredit ? 'kredit' : 'ruecklage',
         kredit_betrag: isKredit ? kredit_betrag : null,
         konto: form.elements['konto']?.value || 'Rücklagen'
@@ -802,9 +879,15 @@ function openEditPostenModal(postenId) {
           <label class="text-sm">Laufzeit (Monate):
             <input name="laufzeit_monate" type="number" min="1" step="1" value="${postenObj.laufzeit_monate || postenObj.faelligkeit_jahre || ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
           </label>
-          <label class="text-sm">Fälligkeitsdatum:
-            <input name="faelligkeitsdatum" type="date" value="${postenObj.faelligkeitsdatum || ''}" required class="mt-1 w-full rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
-          </label>
+          <div class="text-sm">Fälligkeit (Tag & Monat):
+            <div class="flex gap-2 mt-1">
+              <input name="faelligkeit_tag" type="number" min="1" max="31" value="${postenObj.faelligkeit_tag || ''}" placeholder="Tag" required class="w-20 rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100" />
+              <select name="faelligkeit_monat" required class="flex-1 rounded bg-slate-800 border border-zinc-700 px-2 py-1 text-zinc-100">
+                <option value="">Monat...</option>
+                ${[['1','Januar'],['2','Februar'],['3','März'],['4','April'],['5','Mai'],['6','Juni'],['7','Juli'],['8','August'],['9','September'],['10','Oktober'],['11','November'],['12','Dezember']].map(([v,l]) => `<option value="${v}" ${Number(postenObj.faelligkeit_monat) === Number(v) ? 'selected' : ''}>${l}</option>`).join('')}
+              </select>
+            </div>
+          </div>
           <!-- Felder für Rate werden beim Bearbeiten nicht angezeigt -->
           ${zukunftRate ? `<div class='text-xs text-zinc-400 mt-1'>Nächste geplante Rate ab <span class='font-semibold'>${zukunftRate.start_datum}</span>: <span class='font-semibold'>${zukunftRate.betrag.toFixed(2)} €</span></div>` : ''}
           <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded px-4 py-2 mt-2">Speichern</button>
@@ -832,9 +915,10 @@ function openEditPostenModal(postenId) {
     const name = form.elements['name']?.value?.trim() || '';
     const ziel_betrag = Number(form.elements['ziel_betrag']?.value);
     const laufzeit_monate = Number(form.elements['laufzeit_monate']?.value);
-    const faelligkeitsdatum = form.elements['faelligkeitsdatum']?.value;
+    const faelligkeit_tag = Number(form.elements['faelligkeit_tag']?.value);
+    const faelligkeit_monat = Number(form.elements['faelligkeit_monat']?.value);
     // Nur Felder validieren, die im Editier-Modal sichtbar sind
-    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_monate) || laufzeit_monate < 1 || !faelligkeitsdatum) {
+    if (!name || isNaN(ziel_betrag) || ziel_betrag < 0 || isNaN(laufzeit_monate) || laufzeit_monate < 1 || isNaN(faelligkeit_tag) || faelligkeit_tag < 1 || faelligkeit_tag > 31 || isNaN(faelligkeit_monat) || faelligkeit_monat < 1 || faelligkeit_monat > 12) {
       showToast('Bitte alle Felder korrekt ausfüllen!', 'error');
       return;
     }
@@ -844,7 +928,8 @@ function openEditPostenModal(postenId) {
         name,
         ziel_betrag,
         laufzeit_monate,
-        faelligkeitsdatum,
+        faelligkeit_tag,
+        faelligkeit_monat,
         konto
       }).eq('id', postenId);
       // Rate wird im Editier-Modal nicht bearbeitet
@@ -867,6 +952,26 @@ document.addEventListener('click', (e) => {
   if (btn) {
     const postenId = btn.closest('[data-posten-id]')?.dataset.postenId;
     if (postenId) openEditPostenModal(postenId);
+  }
+});
+
+// --- Archiv-Button-Handler ---
+document.addEventListener('click', async (e) => {
+  let btn = e.target.closest('.archive-posten-btn');
+  if (btn) {
+    const postenId = btn.closest('[data-posten-id]')?.dataset.postenId;
+    if (!postenId) return;
+    const postenObj = posten.find(p => p.id === postenId);
+    if (!postenObj) return;
+    const newState = !postenObj.archiviert;
+    try {
+      await supabase.from('posten').update({ archiviert: newState }).eq('id', postenId);
+      showToast(newState ? 'Posten archiviert.' : 'Posten wiederhergestellt.', 'success');
+      await loadData();
+      renderDashboard();
+    } catch (err) {
+      showToast('Fehler beim Archivieren.', 'error');
+    }
   }
 });
 
@@ -904,8 +1009,7 @@ async function loadData() {
         user_id: user.id,
         name: 'Allgemein',
         ziel_betrag: 0,
-        laufzeit_monate: 0,
-        faelligkeitsdatum: new Date().toISOString().slice(0,10)
+        laufzeit_monate: 0
       });
     } catch (err) {
       // Fehler ignorieren, falls Unique-Constraint verletzt wird
